@@ -1,0 +1,21 @@
+{
+	"name": "issuer",
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"test": "bun test"
+	},
+	"main": "./src/index.ts",
+	"module": "./src/index.ts",
+	"types": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@sd-jwt/core": "^0.19.0",
+		"@sd-jwt/hash": "^0.19.0",
+		"@sd-jwt/sd-jwt-vc": "^0.19.0",
+		"jose": "^6.2.2",
+		"zod": "^4.3.6"
+	}
+}

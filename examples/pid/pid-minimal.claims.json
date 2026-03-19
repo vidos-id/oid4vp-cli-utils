@@ -1,0 +1,16 @@
+{
+	"vct": "urn:eudi:pid:1",
+	"given_name": "Ada",
+	"family_name": "Lovelace",
+	"birthdate": "1815-12-10",
+	"place_of_birth": {
+		"locality": "London",
+		"country": "GB"
+	},
+	"nationalities": ["GB"],
+	"issuing_authority": "GB",
+	"issuing_country": "GB",
+	"date_of_issuance": "2025-01-20",
+	"date_of_expiry": "2030-01-20",
+	"attestation_legal_category": "PID"
+}

@@ -1,0 +1,36 @@
+{
+	"client_id": "https://verifier.example/pid-address",
+	"nonce": "pid-address-nonce",
+	"response_type": "vp_token",
+	"dcql_query": {
+		"credentials": [
+			{
+				"id": "pid_address",
+				"format": "dc+sd-jwt",
+				"meta": {
+					"vct_values": ["urn:eudi:pid:1"]
+				},
+				"claims": [
+					{
+						"path": ["given_name"]
+					},
+					{
+						"path": ["family_name"]
+					},
+					{
+						"path": ["address", "formatted"]
+					},
+					{
+						"path": ["address", "locality"]
+					},
+					{
+						"path": ["address", "postal_code"]
+					},
+					{
+						"path": ["address", "country"]
+					}
+				]
+			}
+		]
+	}
+}

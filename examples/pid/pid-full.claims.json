@@ -1,0 +1,32 @@
+{
+	"vct": "urn:eudi:pid:1",
+	"given_name": "Ada",
+	"family_name": "Lovelace",
+	"birth_given_name": "Augusta Ada",
+	"birth_family_name": "Byron",
+	"birthdate": "1815-12-10",
+	"place_of_birth": {
+		"locality": "London",
+		"country": "GB"
+	},
+	"nationalities": ["GB"],
+	"address": {
+		"formatted": "12 St. James's Square, London, SW1Y 4LB, GB",
+		"street_address": "12 St. James's Square",
+		"house_number": "12",
+		"locality": "London",
+		"postal_code": "SW1Y 4LB",
+		"country": "GB"
+	},
+	"personal_administrative_number": "GB-123456789",
+	"sex": 2,
+	"email": "ada.lovelace@example.org",
+	"phone_number": "+442012345678",
+	"issuing_authority": "GB",
+	"issuing_country": "GB",
+	"document_number": "PID-GB-0000001",
+	"date_of_issuance": "2025-01-20",
+	"date_of_expiry": "2030-01-20",
+	"trust_anchor": "https://example.org/trust/pid/gb",
+	"attestation_legal_category": "PID"
+}
