@@ -13,6 +13,42 @@ Built for simple, scriptable credential flows -- primarily created as a PoC for 
 | [`issuer`](packages/issuer/) | Issuer library (used by issuer-cli) |
 | [`wallet`](packages/wallet/) | Wallet library (used by wallet-cli) |
 
+## Install
+
+Release artifacts are published on GitHub Releases as Bun-executable single-file CLIs.
+
+Requirements:
+
+- [Bun](https://bun.sh/) installed
+
+Download the latest release assets:
+
+```bash
+# wallet-cli
+curl -L -o wallet-cli https://github.com/vidos-id/oid4vp-cli-utils/releases/latest/download/wallet-cli.js
+chmod +x wallet-cli
+
+# issuer-cli
+curl -L -o issuer-cli https://github.com/vidos-id/oid4vp-cli-utils/releases/latest/download/issuer-cli.js
+chmod +x issuer-cli
+```
+
+Run them directly:
+
+```bash
+./wallet-cli --help
+./issuer-cli --help
+```
+
+Optional: install globally on your machine by moving them onto your `PATH`:
+
+```bash
+mv wallet-cli ~/.local/bin/wallet-cli
+mv issuer-cli ~/.local/bin/issuer-cli
+```
+
+These artifacts are built for Bun, so they are not directly consumable via `npx` and are not currently published as npm packages for `bunx`.
+
 ## Quick Start
 
 The full issue-hold-present flow in 4 commands:
