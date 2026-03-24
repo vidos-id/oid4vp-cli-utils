@@ -4,6 +4,22 @@ CLI for `dc+sd-jwt` credential holding and OpenID4VP presentation. Wraps the [`w
 
 For the full issue-hold-present flow, see the [root README](../../).
 
+## Install
+
+Download the latest GitHub Release artifact and make it executable:
+
+```bash
+curl -L -o wallet-cli https://github.com/vidos-id/oid4vp-cli-utils/releases/latest/download/wallet-cli.js
+chmod +x wallet-cli
+./wallet-cli --help
+```
+
+For development in this repo, you can run the bin entry directly with Bun:
+
+```bash
+bun packages/wallet-cli/src/index.ts --help
+```
+
 ## Files in `--wallet-dir`
 
 - `holder-key.json` - Holder key pair (private + public JWK)

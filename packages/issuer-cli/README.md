@@ -4,6 +4,22 @@ CLI for `dc+sd-jwt` credential issuance. Wraps the [`issuer`](../issuer/) librar
 
 For the full issue-hold-present flow, see the [root README](../../).
 
+## Install
+
+Download the latest GitHub Release artifact and make it executable:
+
+```bash
+curl -L -o issuer-cli https://github.com/vidos-id/oid4vp-cli-utils/releases/latest/download/issuer-cli.js
+chmod +x issuer-cli
+./issuer-cli --help
+```
+
+For development in this repo, you can run the bin entry directly with Bun:
+
+```bash
+bun packages/issuer-cli/src/index.ts --help
+```
+
 ## Files in `--issuer-dir`
 
 - `signing-key.json` - Issuer signing key (algorithm, private + public JWK)

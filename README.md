@@ -49,21 +49,28 @@ mv issuer-cli ~/.local/bin/issuer-cli
 
 These artifacts are built for Bun, so they are not directly consumable via `npx` and are not currently published as npm packages for `bunx`.
 
+For development in this repo, you can run the package bin entry directly with Bun:
+
+```bash
+bun packages/wallet-cli/src/index.ts --help
+bun packages/issuer-cli/src/index.ts --help
+```
+
 ## Quick Start
 
 The full issue-hold-present flow in 4 commands:
 
 ```bash
 # 1. Initialize wallet (creates holder key)
-bun packages/wallet-cli/src/index.ts init \
+./wallet-cli init \
   --wallet-dir .demo/wallet
 
 # 2. Initialize issuer (generates signing key, JWKS, trust material)
-bun packages/issuer-cli/src/index.ts init \
+./issuer-cli init \
   --issuer-dir .demo/issuer
 
 # 3. Issue a holder-bound credential
-bun packages/issuer-cli/src/index.ts issue \
+./issuer-cli issue \
   --issuer-dir .demo/issuer \
   --holder-key-file .demo/wallet/holder-key.json \
   --issuer https://issuer.example \
@@ -72,7 +79,7 @@ bun packages/issuer-cli/src/index.ts issue \
   --claims-file examples/pid/pid-minimal.claims.json
 
 # 4. Import credential into the wallet
-bun packages/wallet-cli/src/index.ts import \
+./wallet-cli import \
   --wallet-dir .demo/wallet \
   --credential-file .demo/issuer/credential.txt
 ```
@@ -80,7 +87,7 @@ bun packages/wallet-cli/src/index.ts import \
 Then present it:
 
 ```bash
-bun packages/wallet-cli/src/index.ts present \
+./wallet-cli present \
   --wallet-dir .demo/wallet \
   --request '{"client_id":"https://verifier.example","nonce":"n-1","dcql_query":{"credentials":[{"id":"pid","format":"dc+sd-jwt","meta":{"vct_values":["urn:eudi:pid:1"]}}]}}'
 ```
@@ -88,7 +95,7 @@ bun packages/wallet-cli/src/index.ts present \
 Or from an `openid4vp://` authorization URL:
 
 ```bash
-bun packages/wallet-cli/src/index.ts present \
+./wallet-cli present \
   --wallet-dir .demo/wallet \
   --request 'openid4vp://authorize?client_id=https%3A%2F%2Fverifier.example&nonce=n-1&response_type=vp_token&dcql_query=...'
 ```
@@ -101,10 +108,10 @@ Supports ES256, ES384, and EdDSA throughout. Both CLIs accept `--alg` to choose:
 
 ```bash
 # Issuer with ES256
-bun packages/issuer-cli/src/index.ts init --issuer-dir .demo/issuer --alg ES256
+./issuer-cli init --issuer-dir .demo/issuer --alg ES256
 
 # Wallet with EdDSA
-bun packages/wallet-cli/src/index.ts init --wallet-dir .demo/wallet --alg EdDSA
+./wallet-cli init --wallet-dir .demo/wallet --alg EdDSA
 ```
 
 Defaults: EdDSA for issuer signing, ES256 for wallet holder keys.
@@ -113,12 +120,12 @@ You can also import existing key material instead of generating:
 
 ```bash
 # Import a PEM or JWK private key (algorithm auto-detected)
-bun packages/issuer-cli/src/index.ts import-trust-material \
+./issuer-cli import-trust-material \
   --issuer-dir .demo/issuer \
   --private-key ./private-key.pem
 
 # Import an existing holder key
-bun packages/wallet-cli/src/index.ts init \
+./wallet-cli init \
   --wallet-dir .demo/wallet \
   --holder-key-file ./holder-key.jwk.json
 ```

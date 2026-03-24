@@ -2,7 +2,7 @@
 
 Minimal demo wallet library for importing, storing, and presenting `dc+sd-jwt` credentials.
 
-For the CLI wrapper, see [`wallet-cli`](../wallet-cli/). For the full issue-hold-present flow, see the [root README](../../).
+For the CLI wrapper, see [`wallet-cli`](../wallet-cli/). For the installed CLI flow, see the [root README](../../). For development, the CLI bin can be run with `bun packages/wallet-cli/src/index.ts`.
 
 ## Features
 

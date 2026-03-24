@@ -12,6 +12,10 @@ Included examples:
 - `pid-address-request.json` - a DCQL request for address-focused PID claims
 - `pid-basic.openid4vp.txt` - an `openid4vp://` URL carrying the same basic PID DCQL request by value
 
+Use these files with the installed CLIs from the repo root, for example `./issuer-cli issue --claims-file examples/pid/pid-minimal.claims.json`.
+
+For development in this repo, the same flow can be run directly with Bun via `bun packages/issuer-cli/src/index.ts` and `bun packages/wallet-cli/src/index.ts`.
+
 Notes:
 - use `birthdate`, not `birth_date`
 - use `nationalities`, not `nationality`

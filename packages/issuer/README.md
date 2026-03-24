@@ -2,7 +2,7 @@
 
 Minimal demo issuer library for holder-bound `dc+sd-jwt` credentials.
 
-For the CLI wrapper, see [`issuer-cli`](../issuer-cli/).
+For the CLI wrapper, see [`issuer-cli`](../issuer-cli/). For the installed CLI flow, see the [root README](../../). For development, the CLI bin can be run with `bun packages/issuer-cli/src/index.ts`.
 
 ## Features
 
