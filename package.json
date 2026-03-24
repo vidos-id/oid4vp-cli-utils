@@ -1,10 +1,13 @@
 {
 	"name": "oid4vp-cli-utils",
-	"private": true,
 	"type": "module",
 	"workspaces": [
 		"packages/*"
 	],
+	"bin": {
+		"wallet-cli": "./packages/wallet-cli/src/index.ts",
+		"issuer-cli": "./packages/issuer-cli/src/index.ts"
+	},
 	"devDependencies": {
 		"@types/bun": "latest",
 		"typescript": "^5.9.3"

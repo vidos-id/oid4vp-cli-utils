@@ -7,5 +7,14 @@
 	"types": "./src/index.ts",
 	"exports": {
 		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@sd-jwt/core": "^0.19.0",
+		"@sd-jwt/decode": "^0.19.0",
+		"@sd-jwt/hash": "^0.19.0",
+		"@sd-jwt/present": "^0.19.0",
+		"dcql": "^3.0.0",
+		"jose": "^6.2.2",
+		"zod": "^4.3.6"
 	}
 }
