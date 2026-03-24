@@ -14,6 +14,8 @@ chmod +x issuer-cli
 ./issuer-cli --help
 ```
 
+Release artifacts do not bundle the repo's `examples/` directory. For remote example inputs, pass raw GitHub content via `--claims`.
+
 For development in this repo, you can run the bin entry directly with Bun:
 
 ```bash
@@ -53,6 +55,13 @@ issuer-cli issue \
   --vct urn:eudi:pid:1 \
   --claims-file claims.json
 
+# From a raw GitHub example file
+issuer-cli issue \
+  --issuer-dir ./my-issuer \
+  --issuer https://issuer.example \
+  --vct urn:eudi:pid:1 \
+  --claims "$(curl -fsSL https://raw.githubusercontent.com/vidos-id/oid4vp-cli-utils/main/examples/pid/pid-minimal.claims.json)"
+
 # With holder binding (from wallet-cli holder key file)
 issuer-cli issue \
   --issuer-dir ./my-issuer \
@@ -75,7 +84,7 @@ Options:
 - `--issuer <url>` (required) - issuer identifier URL
 - `--vct <uri>` (required) - Verifiable Credential Type URI
 - `--claims <json>` - inline JSON claims
-- `--claims-file <file>` - path to JSON claims file
+- `--claims-file <file>` - path to JSON claims file on local disk
 - `--holder-key-file <file>` - wallet holder key file for holder binding (omit for unbound)
 - `--holder-key <json>` - inline holder key JWK JSON (alternative to `--holder-key-file`)
 - `--credential-file <name>` - output filename (default: `credential-<uuid>.txt`)
@@ -136,6 +145,7 @@ Options:
 - without `--holder-key-file` or `--holder-key`, issuance is unbound (no `cnf` claim)
 - reserved protocol claims (`vct`, `iss`) are issuer-controlled
 - credential output goes to `--issuer-dir`; use [`wallet-cli import`](../wallet-cli/) to bring it into a wallet
+- for remote inputs, use `--claims "$(curl -fsSL <raw-url>)"` instead of `--claims-file`
 
 ## Test
 

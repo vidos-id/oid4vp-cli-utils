@@ -14,6 +14,8 @@ chmod +x wallet-cli
 ./wallet-cli --help
 ```
 
+Release artifacts do not bundle the repo's `examples/` directory. For remote example requests, pass raw GitHub content via `--request`.
+
 For development in this repo, you can run the bin entry directly with Bun:
 
 ```bash
@@ -100,10 +102,20 @@ wallet-cli present \
   --wallet-dir ./my-wallet \
   --request '{"client_id":"https://verifier.example","nonce":"n-1","dcql_query":{...}}'
 
+# From a raw GitHub request JSON
+wallet-cli present \
+  --wallet-dir ./my-wallet \
+  --request "$(curl -fsSL https://raw.githubusercontent.com/vidos-id/oid4vp-cli-utils/main/examples/pid/pid-basic-request.json)"
+
 # From an openid4vp:// authorization URL
 wallet-cli present \
   --wallet-dir ./my-wallet \
   --request 'openid4vp://authorize?client_id=...&nonce=...&dcql_query=...'
+
+# From a raw GitHub openid4vp:// example
+wallet-cli present \
+  --wallet-dir ./my-wallet \
+  --request "$(curl -fsSL https://raw.githubusercontent.com/vidos-id/oid4vp-cli-utils/main/examples/pid/pid-basic.openid4vp.txt)"
 
 # Dry run (don't submit to verifier)
 wallet-cli present \
@@ -130,6 +142,7 @@ Options:
 - when multiple credentials match a query, `present` prompts interactively in a TTY or returns an error with a `--credential-id` suggestion in non-TTY environments
 - only by-value DCQL requests are supported
 - credentials are issued with [`issuer-cli`](../issuer-cli/)
+- for remote inputs, use `--request "$(curl -fsSL <raw-url>)"` instead of relying on a local example file
 
 ## Test
 

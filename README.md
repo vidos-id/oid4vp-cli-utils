@@ -49,6 +49,8 @@ mv issuer-cli ~/.local/bin/issuer-cli
 
 These artifacts are built for Bun, so they are not directly consumable via `npx` and are not currently published as npm packages for `bunx`.
 
+Note: the GitHub Release assets only contain the CLIs, not the `examples/` directory. When using the installed CLIs, either supply your own local files or fetch example inputs from the repo's raw GitHub URLs.
+
 For development in this repo, you can run the package bin entry directly with Bun:
 
 ```bash
@@ -76,7 +78,7 @@ The full issue-hold-present flow in 4 commands:
   --issuer https://issuer.example \
   --vct urn:eudi:pid:1 \
   --credential-file credential.txt \
-  --claims-file examples/pid/pid-minimal.claims.json
+  --claims "$(curl -fsSL https://raw.githubusercontent.com/vidos-id/oid4vp-cli-utils/main/examples/pid/pid-minimal.claims.json)"
 
 # 4. Import credential into the wallet
 ./wallet-cli import \
@@ -89,7 +91,7 @@ Then present it:
 ```bash
 ./wallet-cli present \
   --wallet-dir .demo/wallet \
-  --request '{"client_id":"https://verifier.example","nonce":"n-1","dcql_query":{"credentials":[{"id":"pid","format":"dc+sd-jwt","meta":{"vct_values":["urn:eudi:pid:1"]}}]}}'
+  --request "$(curl -fsSL https://raw.githubusercontent.com/vidos-id/oid4vp-cli-utils/main/examples/pid/pid-basic-request.json)"
 ```
 
 Or from an `openid4vp://` authorization URL:
@@ -140,13 +142,13 @@ Runs the full flow programmatically: generates trust material, issues a holder-b
 
 ## Example Inputs
 
-Reusable example payloads in `examples/pid/`:
+Reusable example payloads live in `examples/pid/` in this repo and can also be fetched from raw GitHub:
 
-- `pid-minimal.claims.json` - minimal PID-style SD-JWT VC claims
-- `pid-full.claims.json` - broader PID-style SD-JWT VC claims
-- `pid-basic-request.json` - basic PID DCQL request
-- `pid-address-request.json` - address-focused PID DCQL request
-- `pid-basic.openid4vp.txt` - by-value `openid4vp://` authorization URL example
+- `pid-minimal.claims.json` - minimal PID-style SD-JWT VC claims - `https://raw.githubusercontent.com/vidos-id/oid4vp-cli-utils/main/examples/pid/pid-minimal.claims.json`
+- `pid-full.claims.json` - broader PID-style SD-JWT VC claims - `https://raw.githubusercontent.com/vidos-id/oid4vp-cli-utils/main/examples/pid/pid-full.claims.json`
+- `pid-basic-request.json` - basic PID DCQL request - `https://raw.githubusercontent.com/vidos-id/oid4vp-cli-utils/main/examples/pid/pid-basic-request.json`
+- `pid-address-request.json` - address-focused PID DCQL request - `https://raw.githubusercontent.com/vidos-id/oid4vp-cli-utils/main/examples/pid/pid-address-request.json`
+- `pid-basic.openid4vp.txt` - by-value `openid4vp://` authorization URL example - `https://raw.githubusercontent.com/vidos-id/oid4vp-cli-utils/main/examples/pid/pid-basic.openid4vp.txt`
 
 ## Validate
 
