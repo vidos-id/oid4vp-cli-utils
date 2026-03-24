@@ -33,17 +33,26 @@ export async function sdJwtHasher(
 	return defaultSdJwtHasher(data, "sha256");
 }
 
-export async function createHolderKeyRecord(): Promise<HolderKeyRecord> {
-	const { privateKey, publicKey } = await generateKeyPair(HOLDER_KEY_ALG, {
-		extractable: true,
-	});
+export async function createHolderKeyRecord(
+	alg?: HolderKeyRecord["algorithm"],
+): Promise<HolderKeyRecord> {
+	const algorithm = alg ?? HOLDER_KEY_ALG;
+	const { privateKey, publicKey } =
+		algorithm === "EdDSA"
+			? await generateKeyPair("EdDSA", {
+					crv: "Ed25519",
+					extractable: true,
+				})
+			: await generateKeyPair(algorithm, {
+					extractable: true,
+				});
 	const publicJwk = await exportJWK(publicKey);
 	const privateJwk = await exportJWK(privateKey);
 	const id = await calculateJwkThumbprint(publicJwk);
 
 	return {
 		id,
-		algorithm: HOLDER_KEY_ALG,
+		algorithm,
 		publicJwk: publicJwk as Record<string, unknown>,
 		privateJwk: privateJwk as Record<string, unknown>,
 		createdAt: new Date().toISOString(),
@@ -92,6 +101,7 @@ export async function createKbJwt(input: {
 export async function issueDemoCredential(input: {
 	issuer: string;
 	issuerPrivateJwk: JWK;
+	issuerAlg?: string;
 	issuerKid?: string;
 	holderPublicJwk: JWK;
 	vct: string;
@@ -101,10 +111,8 @@ export async function issueDemoCredential(input: {
 	issuedAt?: number;
 	saltGenerator?: (length: number) => Promise<string>;
 }): Promise<string> {
-	const issuerKey = await importPrivateKey(
-		input.issuerPrivateJwk,
-		HOLDER_KEY_ALG,
-	);
+	const signingAlg = input.issuerAlg ?? HOLDER_KEY_ALG;
+	const issuerKey = await importPrivateKey(input.issuerPrivateJwk, signingAlg);
 	let saltIndex = 0;
 	const saltGenerator =
 		input.saltGenerator ??
@@ -133,7 +141,7 @@ export async function issueDemoCredential(input: {
 		iat: input.issuedAt ?? Math.floor(Date.now() / 1000),
 	})
 		.setProtectedHeader({
-			alg: HOLDER_KEY_ALG,
+			alg: signingAlg,
 			typ: "dc+sd-jwt",
 			kid: input.issuerKid,
 			...input.headers,

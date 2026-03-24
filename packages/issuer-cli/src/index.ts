@@ -1,19 +1,24 @@
 #!/usr/bin/env bun
 
-import { handleCliError } from "./errors.ts";
+import {
+	handleCliError,
+	readPackageVersion,
+	resolvePackageJsonPath,
+} from "cli-common";
 import { createProgram } from "./program.ts";
 
-export { createGrantAction } from "./actions/create-grant.ts";
-export { createOfferAction } from "./actions/create-offer.ts";
 export { generateTrustMaterialAction } from "./actions/generate-trust-material.ts";
+export { importTrustMaterialAction } from "./actions/import-trust-material.ts";
+export { initIssuerAction } from "./actions/init.ts";
 export { issueCredentialAction } from "./actions/issue.ts";
-export { metadataAction } from "./actions/metadata.ts";
-export { nonceAction } from "./actions/nonce.ts";
 export { createProgram };
 
 export async function runCli(argv = process.argv): Promise<void> {
+	const version = await readPackageVersion(
+		resolvePackageJsonPath(import.meta.url),
+	);
 	try {
-		await createProgram().parseAsync(argv);
+		await createProgram(version).parseAsync(argv);
 	} catch (error) {
 		handleCliError(error);
 	}

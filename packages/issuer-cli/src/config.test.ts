@@ -1,68 +1,38 @@
 import { describe, expect, test } from "bun:test";
-import { resolveCredentialConfigurationId } from "./config.ts";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { resolveIssuerConfig } from "./config.ts";
 
-describe("resolveCredentialConfigurationId", () => {
-	test("matches a unique vct", () => {
-		const id = resolveCredentialConfigurationId(
-			{
-				issuer: "https://issuer.example",
-				signingKey: {
+describe("resolveIssuerConfig", () => {
+	test("rejects verifier trust material passed as signing key file", async () => {
+		const tempDir = await mkdtemp(join(tmpdir(), "issuer-cli-config-"));
+		try {
+			const trustPath = join(tempDir, "trust.json");
+			await writeFile(
+				trustPath,
+				JSON.stringify({
+					kid: "issuer-key-1",
 					alg: "EdDSA",
-					privateJwk: { kty: "OKP", crv: "Ed25519", d: "d", x: "x" },
-					publicJwk: { kty: "OKP", crv: "Ed25519", x: "x" },
-				},
-				credentialConfigurationsSupported: {
-					alpha: {
-						format: "dc+sd-jwt",
-						vct: "vct-a",
-						proof_signing_alg_values_supported: ["EdDSA"],
+					jwks: {
+						keys: [{ kty: "OKP", crv: "Ed25519", x: "x", kid: "issuer-key-1" }],
 					},
-					beta: {
-						format: "dc+sd-jwt",
-						vct: "vct-b",
-						proof_signing_alg_values_supported: ["EdDSA"],
-					},
-				},
-				nonceTtlSeconds: 300,
-				grantTtlSeconds: 600,
-				tokenTtlSeconds: 600,
-			},
-			{ vct: "vct-b" },
-		);
+					publicKeyPem: "pem",
+					certificatePem: "cert",
+					certificateFingerprintSha256: "fingerprint",
+				}),
+				"utf8",
+			);
 
-		expect(id).toBe("beta");
-	});
-
-	test("rejects ambiguous resolution", () => {
-		expect(() =>
-			resolveCredentialConfigurationId(
-				{
+			await expect(
+				resolveIssuerConfig({
 					issuer: "https://issuer.example",
-					signingKey: {
-						alg: "EdDSA",
-						privateJwk: { kty: "OKP", crv: "Ed25519", d: "d", x: "x" },
-						publicJwk: { kty: "OKP", crv: "Ed25519", x: "x" },
-					},
-					credentialConfigurationsSupported: {
-						alpha: {
-							format: "dc+sd-jwt",
-							vct: "shared-vct",
-							proof_signing_alg_values_supported: ["EdDSA"],
-						},
-						beta: {
-							format: "dc+sd-jwt",
-							vct: "shared-vct",
-							proof_signing_alg_values_supported: ["EdDSA"],
-						},
-					},
-					nonceTtlSeconds: 300,
-					grantTtlSeconds: 600,
-					tokenTtlSeconds: 600,
-				},
-				{ vct: "shared-vct" },
-			),
-		).toThrow(
-			"Provide --credential-configuration-id or a uniquely matching --vct",
-		);
+					signingKeyFile: trustPath,
+					vct: "https://example.com/PersonCredential",
+				}),
+			).rejects.toThrow("looks like verifier trust material");
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
 	});
 });

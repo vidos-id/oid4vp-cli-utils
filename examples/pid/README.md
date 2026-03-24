@@ -10,7 +10,7 @@ Included examples:
 - `pid-full.claims.json` - a broader PID example with optional attributes
 - `pid-basic-request.json` - a small DCQL request for a PID
 - `pid-address-request.json` - a DCQL request for address-focused PID claims
-- `pid-basic.oid4vp.txt` - an `oid4vp://` URL carrying the same basic PID DCQL request by value
+- `pid-basic.openid4vp.txt` - an `openid4vp://` URL carrying the same basic PID DCQL request by value
 
 Notes:
 - use `birthdate`, not `birth_date`
@@ -18,4 +18,4 @@ Notes:
 - use `place_of_birth` object
 - use `address.*` members for resident address fields
 - use `date_of_expiry` / `date_of_issuance` for PID metadata in SD-JWT VC form
-- `oid4vp://` examples in this repo are by-value and keep only the supported demo subset
+- `openid4vp://` examples in this repo are by-value and keep only the supported demo subset

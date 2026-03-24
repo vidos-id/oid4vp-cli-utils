@@ -17,6 +17,8 @@ export {
 	type Jwk,
 	jwkSchema,
 	proofObjectSchema,
+	type SigningAlg,
+	signingAlgSchema,
 	type TokenRequest,
 	tokenRequestSchema,
 } from "./schemas.ts";

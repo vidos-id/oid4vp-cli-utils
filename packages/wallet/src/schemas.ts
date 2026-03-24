@@ -7,7 +7,7 @@ export const JwkSchema = z
 
 export const HolderKeyRecordSchema = z.object({
 	id: z.string().min(1),
-	algorithm: z.literal("ES256"),
+	algorithm: z.enum(["ES256", "ES384", "EdDSA"]),
 	publicJwk: JwkSchema,
 	privateJwk: JwkSchema,
 	createdAt: z.string().datetime(),
@@ -43,15 +43,36 @@ export const IssuerKeyMaterialSchema = z.union([
 
 export const ImportCredentialInputSchema = z.object({
 	credential: z.string().min(1),
-	issuer: IssuerKeyMaterialSchema,
+	issuer: IssuerKeyMaterialSchema.optional(),
 });
+
+export const ResponseModeSchema = z.enum(["direct_post", "direct_post.jwt"]);
+
+export const VerifierClientMetadataSchema = z
+	.object({
+		jwks: z
+			.object({
+				keys: z.array(JwkSchema).min(1),
+			})
+			.optional(),
+		encrypted_response_enc_values_supported: z
+			.array(z.string().min(1))
+			.min(1)
+			.optional(),
+		vp_formats_supported: z.unknown().optional(),
+	})
+	.passthrough();
 
 export const OpenId4VpRequestSchema = z
 	.object({
 		client_id: z.string().min(1),
 		nonce: z.string().min(1),
 		dcql_query: z.unknown(),
+		state: z.string().min(1).optional(),
 		response_type: z.literal("vp_token").optional(),
+		response_mode: ResponseModeSchema.optional(),
+		response_uri: z.string().min(1).optional(),
+		client_metadata: VerifierClientMetadataSchema.optional(),
 		scope: z.unknown().optional(),
 		presentation_definition: z.unknown().optional(),
 	})
@@ -82,6 +103,14 @@ export const OpenId4VpRequestSchema = z
 				path: ["response_type"],
 			});
 		}
+
+		if (value.response_mode && !value.response_uri) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: "response_uri is required for direct_post response modes",
+				path: ["response_uri"],
+			});
+		}
 	});
 
 export const WalletConfigSchema = z.object({
@@ -100,5 +129,8 @@ export type StoredCredentialRecord = z.infer<
 export type IssuerKeyMaterial = z.infer<typeof IssuerKeyMaterialSchema>;
 export type ImportCredentialInput = z.infer<typeof ImportCredentialInputSchema>;
 export type OpenId4VpRequestInput = z.infer<typeof OpenId4VpRequestSchema>;
+export type VerifierClientMetadata = z.infer<
+	typeof VerifierClientMetadataSchema
+>;
 
 export type ParsedDcqlQuery = ReturnType<typeof DcqlQuery.parse>;

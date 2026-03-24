@@ -2,15 +2,19 @@
 
 Minimal demo wallet library for importing, storing, and presenting `dc+sd-jwt` credentials.
 
+For the CLI wrapper, see [`wallet-cli`](../wallet-cli/). For the full issue-hold-present flow, see the [root README](../../).
+
 ## Features
 
-- holder-key generation
+- holder-key generation (ES256, ES384, EdDSA)
+- holder-key import from JWK
 - pluggable storage interface
-- issuer JWK/JWKS credential verification
+- issuer JWK/JWKS credential verification (optional)
 - DCQL matching with `dcql`
-- `oid4vp://` authorization URL parsing for by-value DCQL requests
+- `openid4vp://` authorization URL parsing for by-value DCQL requests
 - selective disclosure presentation building
 - KB-JWT holder binding
+- `direct_post` and `direct_post.jwt` authorization response submission
 
 ## Example
 
@@ -19,8 +23,21 @@ import { InMemoryWalletStorage, Wallet } from "wallet";
 
 const wallet = new Wallet(new InMemoryWalletStorage());
 
-await wallet.getOrCreateHolderKey();
+// Default holder key algorithm is ES256; pass "ES384" or "EdDSA" for alternatives
+await wallet.getOrCreateHolderKey("ES256");
 
+// Import a credential (after issuing with the issuer library)
+await wallet.importCredential({
+  credential: "eyJ...",
+});
+
+// Optionally verify against issuer JWKS on import
+await wallet.importCredential({
+  credential: "eyJ...",
+  issuer: { issuer: "https://issuer.example", jwks: { keys: [/* ... */] } },
+});
+
+// Create a presentation from a DCQL request
 const presentation = await wallet.createPresentation({
   client_id: "https://verifier.example",
   nonce: "nonce-123",
@@ -35,15 +52,19 @@ const presentation = await wallet.createPresentation({
   },
 });
 
-const requestFromUrl = Wallet.parseAuthorizationRequestUrl(
-  "oid4vp://authorize?client_id=https%3A%2F%2Fverifier.example&nonce=nonce-123&response_type=vp_token&dcql_query=%7B%22credentials%22%3A%5B%7B%22id%22%3A%22person%22%2C%22format%22%3A%22dc%2Bsd-jwt%22%2C%22meta%22%3A%7B%22vct_values%22%3A%5B%22https%3A%2F%2Fexample.com%2FPersonCredential%22%5D%7D%7D%5D%7D",
-);
+// Parse an openid4vp:// authorization URL
+const request = Wallet.parseAuthorizationRequestUrl("openid4vp://authorize?...");
 ```
 
-Supported `oid4vp://` subset:
+Supported `openid4vp://` subset:
 - by-value only
 - requires `client_id`, `nonce`, and `dcql_query`
 - rejects `request`, `request_uri`, `scope`, and Presentation Exchange input
+
+## See also
+
+- [`issuer`](../issuer/) - issuer library for credential issuance
+- [`scripts/demo-e2e.ts`](../../scripts/demo-e2e.ts) - full programmatic flow using both libraries
 
 ## Test
 

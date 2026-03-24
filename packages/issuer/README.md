@@ -2,6 +2,8 @@
 
 Minimal demo issuer library for holder-bound `dc+sd-jwt` credentials.
 
+For the CLI wrapper, see [`issuer-cli`](../issuer-cli/).
+
 ## Features
 
 - issuer metadata + JWKS output
@@ -10,6 +12,7 @@ Minimal demo issuer library for holder-bound `dc+sd-jwt` credentials.
 - proof JWT validation with `typ=openid4vci-proof+jwt`
 - claim-set driven issuance
 - issuer key and certificate generation for demo trust bootstrapping
+- multi-algorithm support: ES256, ES384, EdDSA
 
 ## Specs
 
@@ -24,12 +27,13 @@ This package implements a deliberately small internal/demo subset of those specs
 ```ts
 import { createIssuer, generateIssuerTrustMaterial } from "issuer";
 
-const trust = await generateIssuerTrustMaterial();
+// Default algorithm is EdDSA; pass "ES256" or "ES384" for alternatives
+const trust = await generateIssuerTrustMaterial("ES256");
 
 const issuer = createIssuer({
   issuer: "https://issuer.example",
   signingKey: {
-    alg: "EdDSA",
+    alg: trust.alg,
     privateJwk: trust.privateJwk,
     publicJwk: trust.publicJwk,
   },
@@ -46,6 +50,8 @@ const offer = issuer.createCredentialOffer({
   claims: { given_name: "Ada", family_name: "Lovelace" },
 });
 ```
+
+For holder binding, the wallet provides its public JWK via a proof JWT -- see the [`wallet`](../wallet/) library and [`scripts/demo-e2e.ts`](../../scripts/demo-e2e.ts) for the full flow.
 
 ## Test
 

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
-import type { issuerConfigSchema } from "issuer";
+import { verbose } from "cli-common";
 import type { z } from "zod";
+import { resolveIssuerDirPaths } from "./paths.ts";
 import {
 	type commonIssuerOptionsSchema,
 	issuerConfigSchema as issuerConfigValidator,
@@ -10,36 +11,41 @@ import {
 export async function resolveIssuerConfig(
 	options: z.infer<typeof commonIssuerOptionsSchema>,
 ) {
-	const configFromFile = options.config
-		? issuerConfigValidator.parse(
-				JSON.parse(await readFile(options.config, "utf8")) as unknown,
-			)
-		: null;
+	const signingKeyFile =
+		options.signingKeyFile ??
+		(options.issuerDir
+			? resolveIssuerDirPaths(options.issuerDir).signingKeyFile
+			: undefined);
 
-	if (configFromFile) {
-		if (!options.issuer) {
-			return configFromFile;
-		}
-		return issuerConfigValidator.parse({
-			...configFromFile,
-			issuer: options.issuer,
-		});
-	}
+	const provided: string[] = [];
+	const missing: string[] = [];
+	if (options.issuer) provided.push("--issuer");
+	else missing.push("--issuer");
+	if (signingKeyFile)
+		provided.push(
+			options.signingKeyFile ? "--signing-key-file" : "--issuer-dir",
+		);
+	else missing.push("--issuer-dir or --signing-key-file");
+	if (options.vct) provided.push("--vct");
+	else missing.push("--vct");
 
-	if (!options.issuer || !options.signingKeyFile || !options.vct) {
+	if (missing.length > 0) {
+		const providedText =
+			provided.length > 0 ? ` You provided ${provided.join(", ")}.` : "";
 		throw new Error(
-			"Inline issuer config requires --issuer, --signing-key-file, and --vct",
+			`Missing required options: ${missing.join(", ")}.${providedText}`,
 		);
 	}
 
-	const signingKey = await readSigningKeyFile(options.signingKeyFile);
-	const credentialConfigurationId =
-		options.credentialConfigurationId ?? "credential";
+	verbose(
+		`Building inline config: issuer=${options.issuer}, vct=${options.vct}, signingKeyFile=${signingKeyFile}`,
+	);
+	const signingKey = await readSigningKeyFile(signingKeyFile as string);
 	return issuerConfigValidator.parse({
 		issuer: options.issuer,
 		signingKey,
 		credentialConfigurationsSupported: {
-			[credentialConfigurationId]: {
+			credential: {
 				format: "dc+sd-jwt",
 				vct: options.vct,
 			},
@@ -47,47 +53,24 @@ export async function resolveIssuerConfig(
 	});
 }
 
-export function resolveCredentialConfigurationId(
-	config: z.infer<typeof issuerConfigSchema>,
-	options: z.infer<typeof commonIssuerOptionsSchema>,
-): string {
-	if (options.credentialConfigurationId) {
+async function readSigningKeyFile(filePath: string) {
+	verbose(`Reading signing key from ${filePath}`);
+	const raw = JSON.parse(await readFile(filePath, "utf8")) as unknown;
+	const parsed = signingKeyFileSchema.safeParse(raw);
+	if (!parsed.success) {
 		if (
-			!config.credentialConfigurationsSupported[
-				options.credentialConfigurationId
-			]
+			typeof raw === "object" &&
+			raw !== null &&
+			"jwks" in raw &&
+			"certificatePem" in raw &&
+			!("privateJwk" in raw) &&
+			!("signingKey" in raw)
 		) {
 			throw new Error(
-				`Unknown credential configuration id: ${options.credentialConfigurationId}`,
+				`Invalid --signing-key-file: ${filePath} looks like verifier trust material and does not contain a private signing key. Regenerate it with:\n  issuer-cli generate-trust-material --signing-key-out <file>`,
 			);
 		}
-		return options.credentialConfigurationId;
+		throw parsed.error;
 	}
-
-	if (options.vct) {
-		const matches = Object.entries(
-			config.credentialConfigurationsSupported,
-		).filter(([, entry]) => entry.vct === options.vct);
-		const matched = matches[0];
-		if (matches.length === 1 && matched) {
-			return matched[0];
-		}
-	}
-
-	const ids = Object.keys(config.credentialConfigurationsSupported);
-	const firstId = ids[0];
-	if (ids.length === 1 && firstId) {
-		return firstId;
-	}
-
-	throw new Error(
-		"Provide --credential-configuration-id or a uniquely matching --vct",
-	);
-}
-
-async function readSigningKeyFile(filePath: string) {
-	const parsed = signingKeyFileSchema.parse(
-		JSON.parse(await readFile(filePath, "utf8")) as unknown,
-	);
-	return "signingKey" in parsed ? parsed.signingKey : parsed;
+	return "signingKey" in parsed.data ? parsed.data.signingKey : parsed.data;
 }

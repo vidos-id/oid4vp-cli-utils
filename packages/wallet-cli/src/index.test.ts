@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { exportJWK, generateKeyPair } from "jose";
@@ -8,8 +8,28 @@ import {
 	type QueryCredentialMatches,
 	Wallet,
 } from "wallet";
-import { importCredentialAction, presentCredentialAction } from "./index.ts";
+import {
+	importCredentialAction,
+	initWalletAction,
+	presentCredentialAction,
+} from "./index.ts";
 import { FileSystemWalletStorage } from "./storage.ts";
+
+async function withMockedFetch(
+	mock: (
+		input: RequestInfo | URL,
+		init?: RequestInit | BunFetchRequestInit,
+	) => Promise<Response>,
+	run: () => Promise<void>,
+): Promise<void> {
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = mock as typeof fetch;
+	try {
+		await run();
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+}
 
 async function createIssuerFixture() {
 	const { privateKey, publicKey } = await generateKeyPair("ES256", {
@@ -53,18 +73,10 @@ describe("wallet-cli", () => {
 			await importCredentialAction({
 				walletDir,
 				credential: credentialA,
-				issuerMetadata: JSON.stringify({
-					issuer: issuer.issuer,
-					jwks: { keys: [issuer.publicJwk] },
-				}),
 			});
 			await importCredentialAction({
 				walletDir,
 				credential: credentialB,
-				issuerMetadata: JSON.stringify({
-					issuer: issuer.issuer,
-					jwks: { keys: [issuer.publicJwk] },
-				}),
 			});
 
 			const files = await readdir(join(walletDir, "credentials"));
@@ -80,24 +92,28 @@ describe("wallet-cli", () => {
 		}
 	});
 
+	test("init creates holder key before issuance", async () => {
+		const walletDir = await mkdtemp(join(tmpdir(), "wallet-cli-init-"));
+		try {
+			const result = await initWalletAction({ walletDir });
+			expect(result.holderKey.id.length).toBeGreaterThan(0);
+			expect(await readdir(walletDir)).toContain("holder-key.json");
+		} finally {
+			await rm(walletDir, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects presentation exchange input", async () => {
 		const walletDir = await mkdtemp(join(tmpdir(), "wallet-cli-request-"));
 		try {
-			const requestPath = join(walletDir, "request.json");
-			await writeFile(
-				requestPath,
-				JSON.stringify({
-					client_id: "https://verifier.example",
-					nonce: "nonce-1",
-					presentation_definition: { id: "pd-1", input_descriptors: [] },
-				}),
-				"utf8",
-			);
-
 			await expect(
 				presentCredentialAction({
 					walletDir,
-					requestFile: requestPath,
+					request: JSON.stringify({
+						client_id: "https://verifier.example",
+						nonce: "nonce-1",
+						presentation_definition: { id: "pd-1", input_descriptors: [] },
+					}),
 				}),
 			).rejects.toThrow("Presentation Exchange is unsupported");
 		} finally {
@@ -105,8 +121,8 @@ describe("wallet-cli", () => {
 		}
 	});
 
-	test("accepts an oid4vp authorization URL", async () => {
-		const walletDir = await mkdtemp(join(tmpdir(), "wallet-cli-oid4vp-"));
+	test("accepts an openid4vp authorization URL", async () => {
+		const walletDir = await mkdtemp(join(tmpdir(), "wallet-cli-openid4vp-"));
 		try {
 			const storage = new FileSystemWalletStorage(walletDir);
 			const wallet = new Wallet(storage);
@@ -126,15 +142,11 @@ describe("wallet-cli", () => {
 			await importCredentialAction({
 				walletDir,
 				credential,
-				issuerMetadata: JSON.stringify({
-					issuer: issuer.issuer,
-					jwks: { keys: [issuer.publicJwk] },
-				}),
 			});
 
 			const result = await presentCredentialAction({
 				walletDir,
-				request: `oid4vp://authorize?client_id=${encodeURIComponent("https://verifier.example")}&nonce=nonce-1&response_type=vp_token&dcql_query=${encodeURIComponent(JSON.stringify({ credentials: [{ id: "person_credential", format: "dc+sd-jwt", meta: { vct_values: ["https://example.com/PersonCredential"] }, claims: [{ path: ["given_name"] }] }] }))}`,
+				request: `openid4vp://authorize?client_id=${encodeURIComponent("https://verifier.example")}&nonce=nonce-1&response_type=vp_token&dcql_query=${encodeURIComponent(JSON.stringify({ credentials: [{ id: "person_credential", format: "dc+sd-jwt", meta: { vct_values: ["https://example.com/PersonCredential"] }, claims: [{ path: ["given_name"] }] }] }))}`,
 			});
 
 			expect(result.matchedCredentials[0]?.vct).toBe(
@@ -176,18 +188,10 @@ describe("wallet-cli", () => {
 			const importedAda = await importCredentialAction({
 				walletDir,
 				credential: credentialAda,
-				issuerMetadata: JSON.stringify({
-					issuer: issuer.issuer,
-					jwks: { keys: [issuer.publicJwk] },
-				}),
 			});
 			const importedGrace = await importCredentialAction({
 				walletDir,
 				credential: credentialGrace,
-				issuerMetadata: JSON.stringify({
-					issuer: issuer.issuer,
-					jwks: { keys: [issuer.publicJwk] },
-				}),
 			});
 
 			const result = await presentCredentialAction({
@@ -219,6 +223,80 @@ describe("wallet-cli", () => {
 			expect(result.matchedCredentials[0]?.credentialId).toBe(
 				importedGrace.credential.id,
 			);
+		} finally {
+			await rm(walletDir, { recursive: true, force: true });
+		}
+	});
+
+	test("auto-submits direct_post unless dry-run is set", async () => {
+		const walletDir = await mkdtemp(join(tmpdir(), "wallet-cli-submit-"));
+		try {
+			const storage = new FileSystemWalletStorage(walletDir);
+			const wallet = new Wallet(storage);
+			const issuer = await createIssuerFixture();
+			const holderKey = await wallet.getOrCreateHolderKey();
+
+			const credential = await issueDemoCredential({
+				issuer: issuer.issuer,
+				issuerPrivateJwk: issuer.privateJwk,
+				holderPublicJwk: holderKey.publicJwk as never,
+				vct: "https://example.com/PersonCredential",
+				claims: { given_name: "Ada" },
+				disclosureFrame: { _sd: ["given_name"] },
+				issuedAt: 1,
+			});
+
+			await importCredentialAction({
+				walletDir,
+				credential,
+			});
+
+			let postCount = 0;
+			await withMockedFetch(
+				async (_input, init) => {
+					postCount += 1;
+					expect(init?.method).toBe("POST");
+					return new Response(JSON.stringify({ ok: true }), {
+						status: 200,
+						headers: { "content-type": "application/json" },
+					});
+				},
+				async () => {
+					const request = JSON.stringify({
+						client_id: "https://verifier.example",
+						nonce: "nonce-1",
+						response_mode: "direct_post",
+						response_uri: "https://verifier.example/response",
+						dcql_query: {
+							credentials: [
+								{
+									id: "person_credential",
+									format: "dc+sd-jwt",
+									meta: {
+										vct_values: ["https://example.com/PersonCredential"],
+									},
+									claims: [{ path: ["given_name"] }],
+								},
+							],
+						},
+					});
+
+					const submitted = await presentCredentialAction({
+						walletDir,
+						request,
+					});
+					expect(submitted.submitted).toBe(true);
+
+					const dryRun = await presentCredentialAction({
+						walletDir,
+						request,
+						dryRun: true,
+					});
+					expect(dryRun.submitted).toBe(false);
+				},
+			);
+
+			expect(postCount).toBe(1);
 		} finally {
 			await rm(walletDir, { recursive: true, force: true });
 		}

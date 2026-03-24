@@ -63,19 +63,44 @@ export type ValidatedProof = {
 	protectedHeader: Record<string, unknown>;
 };
 
-const signerAlg = "EdDSA";
+type IssuanceBinding = {
+	holderPublicJwk?: JWK;
+	holderKeyThumbprint?: string;
+};
+
+const RESERVED_CREDENTIAL_CLAIMS = new Set([
+	"iss",
+	"nbf",
+	"exp",
+	"cnf",
+	"vct",
+	"status",
+	"iat",
+]);
 
 const deriveDisclosureFrame = (claims: ClaimSet) => {
-	const topLevelClaims = Object.keys(claims);
+	const topLevelClaims = Object.keys(claims).filter(
+		(claim) => !RESERVED_CREDENTIAL_CLAIMS.has(claim),
+	);
 	if (topLevelClaims.length === 0) {
 		return undefined;
 	}
 	return { _sd: topLevelClaims };
 };
 
+const sanitizeCredentialClaims = (claims: ClaimSet): ClaimSet =>
+	Object.fromEntries(
+		Object.entries(claims).filter(
+			([claim]) => !RESERVED_CREDENTIAL_CLAIMS.has(claim),
+		),
+	);
+
 const subtleAlgorithm = (alg: string): AlgorithmIdentifier | EcdsaParams => {
 	if (alg === "EdDSA") {
 		return "Ed25519";
+	}
+	if (alg === "ES384") {
+		return { name: "ECDSA", hash: "SHA-384" };
 	}
 	return { name: "ECDSA", hash: "SHA-256" };
 };
@@ -132,14 +157,14 @@ export class DemoIssuer {
 		this.idGenerator = options?.idGenerator ?? randomToken;
 		this.issuerPrivateKeyPromise = importJWK(
 			this.config.signingKey.privateJwk,
-			signerAlg,
+			this.config.signingKey.alg,
 			{
 				extractable: false,
 			},
 		) as Promise<CryptoKey>;
 		this.issuerPublicKeyPromise = importJWK(
 			this.config.signingKey.publicJwk,
-			signerAlg,
+			this.config.signingKey.alg,
 			{
 				extractable: true,
 			},
@@ -150,9 +175,9 @@ export class DemoIssuer {
 		]).then(
 			([privateKey, publicKey]) =>
 				new SDJwtVcInstance({
-					signer: createSdJwtSigner(privateKey, signerAlg),
-					signAlg: signerAlg,
-					verifier: createSdJwtVerifier(publicKey, signerAlg),
+					signer: createSdJwtSigner(privateKey, this.config.signingKey.alg),
+					signAlg: this.config.signingKey.alg,
+					verifier: createSdJwtVerifier(publicKey, this.config.signingKey.alg),
 					hasher,
 					hashAlg: "sha-256",
 					saltGenerator: async (length = 16) =>
@@ -199,7 +224,9 @@ export class DemoIssuer {
 								},
 							},
 							cryptographic_binding_methods_supported: ["jwk"],
-							credential_signing_alg_values_supported: [signerAlg],
+							credential_signing_alg_values_supported: [
+								this.config.signingKey.alg,
+							],
 						},
 					],
 				),
@@ -392,23 +419,41 @@ export class DemoIssuer {
 				"Unsupported credential_configuration_id",
 			);
 		}
-		const validatedProof = await this.validateProofJwt({
-			jwt: parsed.proof.jwt,
-		});
+		const binding: IssuanceBinding = parsed.proof
+			? await this.validateProofJwt({
+					jwt: parsed.proof.jwt,
+				})
+			: parsed.holderPublicJwk
+				? {
+						holderPublicJwk: parsed.holderPublicJwk as JWK,
+						holderKeyThumbprint: await calculateJwkThumbprint(
+							parsed.holderPublicJwk as JWK,
+						),
+					}
+				: {};
 		const sdJwtVc = await this.sdJwtVc;
 		const issuedAt = this.now();
+		const credentialClaims = sanitizeCredentialClaims(accessToken.claims);
 		const payload = {
 			iss: this.config.issuer,
 			iat: issuedAt,
 			vct: configuration.vct,
-			cnf: {
-				jwk: validatedProof.holderPublicJwk,
-			},
-			...cloneJson(accessToken.claims),
+			cnf: binding.holderPublicJwk
+				? {
+						jwk: binding.holderPublicJwk,
+					}
+				: undefined,
+			...cloneJson(credentialClaims),
 		};
 		const credential = await sdJwtVc.issue(
 			payload,
-			deriveDisclosureFrame(accessToken.claims) as never,
+			deriveDisclosureFrame(credentialClaims) as never,
+			{
+				header: {
+					kid: this.config.signingKey.publicJwk.kid,
+					x5c: this.config.signingKey.publicJwk.x5c,
+				},
+			},
 		);
 		accessToken.used = true;
 		return {

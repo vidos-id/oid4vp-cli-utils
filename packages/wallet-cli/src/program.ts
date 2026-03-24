@@ -1,64 +1,139 @@
+import { printResult, setVerbose, verbose } from "cli-common";
 import { Command } from "commander";
 import { importCredentialAction } from "./actions/import.ts";
+import { initWalletAction } from "./actions/init.ts";
 import { listCredentialsAction } from "./actions/list.ts";
 import { presentCredentialAction } from "./actions/present.ts";
 import { showCredentialAction } from "./actions/show.ts";
-import { printResult } from "./io.ts";
 
-export function createProgram(): Command {
+export function createProgram(version: string): Command {
 	const program = new Command()
 		.name("wallet-cli")
+		.version(version)
 		.description(
-			"Demo wallet CLI for dc+sd-jwt import and OpenID4VP presentation",
-		);
+			"Demo wallet CLI for dc+sd-jwt credential import and OpenID4VP presentation",
+		)
+		.option("--verbose", "Enable verbose logging to stderr", false)
+		.hook("preAction", (_thisCommand, actionCommand) => {
+			const opts = actionCommand.optsWithGlobals();
+			if (opts.verbose) {
+				setVerbose(true);
+			}
+		});
+
+	program
+		.command("init")
+		.description("Initialize a wallet directory and create a holder key")
+		.requiredOption(
+			"--wallet-dir <dir>",
+			"Path to the wallet storage directory (created if it does not exist)",
+		)
+		.option(
+			"--alg <algorithm>",
+			"Holder key algorithm: ES256, ES384, or EdDSA (default: ES256)",
+		)
+		.option(
+			"--holder-key-file <file>",
+			"Import an existing holder key from a JWK JSON file instead of generating one",
+		)
+		.addHelpText(
+			"after",
+			`
+Examples:
+  $ wallet-cli init --wallet-dir ./my-wallet`,
+		)
+		.action(async (options) => {
+			verbose(`Initializing wallet in ${options.walletDir}`);
+			const result = await initWalletAction(options);
+			printResult(result, "json");
+		});
 
 	program
 		.command("import")
-		.description(
-			"Import an issuer-bound credential into file-backed wallet storage",
-		)
-		.requiredOption("--wallet-dir <dir>", "Wallet storage directory")
-		.option("--credential <compact>", "Inline dc+sd-jwt credential")
-		.option("--credential-file <file>", "Read dc+sd-jwt credential from file")
-		.option(
-			"--issuer <issuer>",
-			"Issuer identifier when not using issuer metadata",
+		.description("Import an issued dc+sd-jwt credential into the wallet")
+		.requiredOption(
+			"--wallet-dir <dir>",
+			"Path to the wallet storage directory",
 		)
 		.option(
-			"--issuer-metadata <json>",
-			"Inline issuer metadata JSON with issuer + jwks",
+			"--credential <value>",
+			"Inline credential text (compact dc+sd-jwt)",
 		)
 		.option(
-			"--issuer-metadata-file <file>",
-			"Read issuer metadata JSON from file",
+			"--credential-file <file>",
+			"Path to a credential file (compact dc+sd-jwt text)",
 		)
-		.option("--issuer-jwks-file <file>", "Read issuer JWKS JSON from file")
-		.option("--issuer-jwk-file <file>", "Read single issuer JWK JSON from file")
-		.option("--output <format>", "Output format: json|pretty", "pretty")
+		.addHelpText(
+			"after",
+			`
+Examples:
+  $ wallet-cli import \\
+      --wallet-dir ./my-wallet \\
+      --credential-file ./issuer/credential.txt
+
+  $ wallet-cli import \\
+      --wallet-dir ./my-wallet \\
+      --credential 'eyJ...'`,
+		)
 		.action(async (options) => {
+			verbose(`Importing credential`);
 			const result = await importCredentialAction(options);
-			printResult(result, options.output);
+			printResult(result, "json");
 		});
 
 	program
 		.command("list")
-		.description("List stored credentials from a wallet directory")
-		.requiredOption("--wallet-dir <dir>", "Wallet storage directory")
-		.option("--vct <vct>", "Filter credentials by vct")
-		.option("--issuer <issuer>", "Filter credentials by issuer")
-		.option("--output <format>", "Output format: json|pretty", "pretty")
+		.description("List stored credentials in the wallet")
+		.requiredOption(
+			"--wallet-dir <dir>",
+			"Path to the wallet storage directory",
+		)
+		.option(
+			"--vct <uri>",
+			"Filter by Verifiable Credential Type URI (e.g. urn:eudi:pid:1)",
+		)
+		.option(
+			"--issuer <url>",
+			"Filter by issuer identifier URL (e.g. https://issuer.example)",
+		)
+		.addHelpText(
+			"after",
+			`
+Examples:
+  $ wallet-cli list --wallet-dir ./my-wallet
+  $ wallet-cli list --wallet-dir ./my-wallet --vct urn:eudi:pid:1`,
+		)
 		.action(async (options) => {
+			verbose(`Listing credentials in ${options.walletDir}`);
 			const result = await listCredentialsAction(options);
-			printResult(result, options.output);
+			printResult(result, "json");
 		});
 
 	program
 		.command("show")
-		.description("Show one stored credential")
-		.requiredOption("--wallet-dir <dir>", "Wallet storage directory")
-		.requiredOption("--credential-id <id>", "Stored credential id")
-		.option("--output <format>", "Output format: json|pretty|raw", "pretty")
+		.description("Show a single stored credential by id")
+		.requiredOption(
+			"--wallet-dir <dir>",
+			"Path to the wallet storage directory",
+		)
+		.requiredOption(
+			"--credential-id <id>",
+			"Credential id (from list output) to display",
+		)
+		.option(
+			"--output <format>",
+			"Output format: json or raw (compact sd-jwt text)",
+			"json",
+		)
+		.addHelpText(
+			"after",
+			`
+Examples:
+  $ wallet-cli show --wallet-dir ./my-wallet --credential-id <id>
+  $ wallet-cli show --wallet-dir ./my-wallet --credential-id <id> --output raw`,
+		)
 		.action(async (options) => {
+			verbose(`Showing credential ${options.credentialId}`);
 			const result = await showCredentialAction(options);
 			if (options.output === "raw") {
 				process.stdout.write(`${result.credential.compactSdJwt}\n`);
@@ -69,22 +144,46 @@ export function createProgram(): Command {
 
 	program
 		.command("present")
-		.description("Create a dcql_query-based OpenID4VP presentation")
-		.requiredOption("--wallet-dir <dir>", "Wallet storage directory")
-		.option(
-			"--request <value>",
-			"Inline OpenID4VP request JSON or oid4vp:// authorization URL",
+		.description(
+			"Create a DCQL-based OpenID4VP presentation from wallet credentials",
 		)
-		.option(
-			"--request-file <file>",
-			"Read OpenID4VP request JSON or oid4vp:// authorization URL from file",
+		.requiredOption(
+			"--wallet-dir <dir>",
+			"Path to the wallet storage directory",
+		)
+		.requiredOption(
+			"--request <value>",
+			"OpenID4VP request JSON or an openid4vp:// authorization URL",
 		)
 		.option(
 			"--credential-id <id>",
-			"Limit presentation generation to one stored credential",
+			"Use a specific credential for the presentation (skip selection prompt)",
 		)
-		.option("--output <format>", "Output format: json|pretty|raw", "pretty")
+		.option(
+			"--dry-run",
+			"Build the VP response but do not submit it to the verifier",
+		)
+		.option(
+			"--output <format>",
+			"Output format: json or raw (vp_token text only)",
+			"json",
+		)
+		.addHelpText(
+			"after",
+			`
+Examples:
+  $ wallet-cli present \
+      --wallet-dir ./my-wallet \
+      --request 'openid4vp://authorize?...'
+
+  $ wallet-cli present \
+      --wallet-dir ./my-wallet \
+      --request '{"client_id":"https://verifier.example","nonce":"...","dcql_query":{...}}' \
+      --credential-id <id> \
+      --dry-run`,
+		)
 		.action(async (options) => {
+			verbose(`Creating presentation from ${options.walletDir}`);
 			const result = await presentCredentialAction(options);
 			if (options.output === "raw") {
 				process.stdout.write(`${result.vpToken}\n`);

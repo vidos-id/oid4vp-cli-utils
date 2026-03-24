@@ -7,7 +7,7 @@ import { exportJWK, exportPKCS8, exportSPKI, generateKeyPair } from "jose";
 import { jwkSchema } from "./schemas.ts";
 
 export type GeneratedTrustMaterial = {
-	alg: "EdDSA";
+	alg: "ES256" | "ES384" | "EdDSA";
 	kid: string;
 	privateJwk: JWK;
 	publicJwk: JWK;
@@ -18,7 +18,7 @@ export type GeneratedTrustMaterial = {
 	jwks: { keys: [JWK] };
 	trustArtifact: {
 		kid: string;
-		alg: "EdDSA";
+		alg: "ES256" | "ES384" | "EdDSA";
 		jwks: { keys: [JWK] };
 		publicKeyPem: string;
 		certificatePem: string;
@@ -32,28 +32,37 @@ const cleanupFingerprint = (value: string) =>
 		.replaceAll(":", "")
 		.trim();
 
+const certificatePemToX5c = (certificatePem: string) => [
+	certificatePem
+		.replace("-----BEGIN CERTIFICATE-----", "")
+		.replace("-----END CERTIFICATE-----", "")
+		.replace(/\s+/g, ""),
+];
+
 export const generateIssuerTrustMaterial = async (input?: {
 	kid?: string;
 	subject?: string;
 	daysValid?: number;
+	alg?: "ES256" | "ES384" | "EdDSA";
 }) => {
 	const kid = input?.kid ?? "issuer-key-1";
 	const subject = input?.subject ?? "/CN=Demo Issuer/O=oid4vp-cli-utils";
 	const daysValid = input?.daysValid ?? 365;
-	const { privateKey, publicKey } = await generateKeyPair("EdDSA", {
-		crv: "Ed25519",
-		extractable: true,
-	});
+	const alg = input?.alg ?? "EdDSA";
+	const { privateKey, publicKey } =
+		alg === "EdDSA"
+			? await generateKeyPair("EdDSA", { crv: "Ed25519", extractable: true })
+			: await generateKeyPair(alg, { extractable: true });
 	const privateJwk = jwkSchema.parse({
 		...(await exportJWK(privateKey)),
 		kid,
-		alg: "EdDSA",
+		alg,
 		use: "sig",
 	});
 	const publicJwk = jwkSchema.parse({
 		...(await exportJWK(publicKey)),
 		kid,
-		alg: "EdDSA",
+		alg,
 		use: "sig",
 	});
 	const privateKeyPem = await exportPKCS8(privateKey);
@@ -89,13 +98,18 @@ export const generateIssuerTrustMaterial = async (input?: {
 			{ encoding: "utf8" },
 		);
 		const certificateFingerprintSha256 = cleanupFingerprint(fingerprintOutput);
-		const jwks = { keys: [publicJwk as JWK] as [JWK] };
+		const x5c = certificatePemToX5c(certificatePem);
+		const publicJwkWithCertificate = jwkSchema.parse({
+			...publicJwk,
+			x5c,
+		});
+		const jwks = { keys: [publicJwkWithCertificate as JWK] as [JWK] };
 
 		return {
-			alg: "EdDSA" as const,
+			alg: alg as typeof alg,
 			kid,
 			privateJwk: privateJwk as JWK,
-			publicJwk: publicJwk as JWK,
+			publicJwk: publicJwkWithCertificate as JWK,
 			privateKeyPem,
 			publicKeyPem,
 			certificatePem,
@@ -103,7 +117,7 @@ export const generateIssuerTrustMaterial = async (input?: {
 			jwks,
 			trustArtifact: {
 				kid,
-				alg: "EdDSA" as const,
+				alg: alg as typeof alg,
 				jwks,
 				publicKeyPem,
 				certificatePem,

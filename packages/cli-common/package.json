@@ -1,17 +1,15 @@
 {
-	"name": "wallet-cli",
+	"name": "cli-common",
 	"version": "0.0.0",
 	"type": "module",
 	"main": "./src/index.ts",
 	"module": "./src/index.ts",
 	"types": "./src/index.ts",
-	"bin": {
-		"wallet-cli": "./src/index.ts"
+	"exports": {
+		".": "./src/index.ts"
 	},
 	"dependencies": {
-		"cli-common": "workspace:*",
 		"commander": "^14.0.3",
-		"zod": "^4.3.6",
-		"wallet": "workspace:*"
+		"zod": "^4.3.6"
 	}
 }

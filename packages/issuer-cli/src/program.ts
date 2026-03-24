@@ -1,137 +1,118 @@
+import { printResult, setVerbose, verbose } from "cli-common";
 import { Command } from "commander";
-import { createGrantAction } from "./actions/create-grant.ts";
-import { createOfferAction } from "./actions/create-offer.ts";
 import { generateTrustMaterialAction } from "./actions/generate-trust-material.ts";
+import { importTrustMaterialAction } from "./actions/import-trust-material.ts";
+import { initIssuerAction } from "./actions/init.ts";
 import { issueCredentialAction } from "./actions/issue.ts";
-import { metadataAction } from "./actions/metadata.ts";
-import { nonceAction } from "./actions/nonce.ts";
-import { printResult } from "./io.ts";
 
-export function createProgram(): Command {
+export function createProgram(version: string): Command {
 	const program = new Command()
 		.name("issuer-cli")
-		.description("Demo issuer CLI for dc+sd-jwt issuance helpers");
-
-	program
-		.command("metadata")
-		.description("Output issuer metadata")
-		.option("--config <file>", "Read full issuer config JSON from file")
-		.option(
-			"--issuer <url>",
-			"Override issuer identifier or build config inline",
-		)
-		.option(
-			"--signing-key-file <file>",
-			"Read signing key JSON or trust material JSON from file",
-		)
-		.option(
-			"--credential-configuration-id <id>",
-			"Credential configuration id for inline config",
-		)
-		.option("--vct <vct>", "Credential type for inline config")
-		.option("--output <format>", "Output format: json|pretty", "pretty")
-		.action(async (options) => {
-			printResult(await metadataAction(options), options.output);
+		.version(version)
+		.description("Demo issuer CLI for dc+sd-jwt credential issuance")
+		.option("--verbose", "Enable verbose logging to stderr", false)
+		.hook("preAction", (_thisCommand, actionCommand) => {
+			const opts = actionCommand.optsWithGlobals();
+			if (opts.verbose) {
+				setVerbose(true);
+			}
 		});
 
 	program
-		.command("create-offer")
-		.description("Create a pre-authorized credential offer")
-		.option("--config <file>", "Read full issuer config JSON from file")
-		.option(
-			"--issuer <url>",
-			"Override issuer identifier or build config inline",
+		.command("init")
+		.description(
+			"Initialize an issuer directory with signing keys, JWKS, and trust material",
 		)
-		.option(
-			"--signing-key-file <file>",
-			"Read signing key JSON or trust material JSON from file",
+		.requiredOption(
+			"--issuer-dir <dir>",
+			"Path to the issuer directory (created if it does not exist)",
 		)
-		.option("--credential-configuration-id <id>", "Credential configuration id")
-		.option("--vct <vct>", "Resolve credential configuration by vct")
-		.option("--claims <json>", "Inline claim-set JSON")
-		.option("--claims-file <file>", "Read claim-set JSON from file")
-		.option("--expires-in <seconds>", "Grant lifetime override in seconds")
-		.option("--output <format>", "Output format: json|pretty|raw", "pretty")
+		.addHelpText(
+			"after",
+			`
+Examples:
+  $ issuer-cli init --issuer-dir ./my-issuer`,
+		)
 		.action(async (options) => {
-			printResult(await createOfferAction(options), options.output);
-		});
-
-	program
-		.command("create-grant")
-		.description("Create a pre-authorized grant")
-		.option("--config <file>", "Read full issuer config JSON from file")
-		.option(
-			"--issuer <url>",
-			"Override issuer identifier or build config inline",
-		)
-		.option(
-			"--signing-key-file <file>",
-			"Read signing key JSON or trust material JSON from file",
-		)
-		.option("--credential-configuration-id <id>", "Credential configuration id")
-		.option("--vct <vct>", "Resolve credential configuration by vct")
-		.option("--claims <json>", "Inline claim-set JSON")
-		.option("--claims-file <file>", "Read claim-set JSON from file")
-		.option("--expires-in <seconds>", "Grant lifetime override in seconds")
-		.option("--output <format>", "Output format: json|pretty|raw", "pretty")
-		.action(async (options) => {
-			printResult(await createGrantAction(options), options.output);
-		});
-
-	program
-		.command("nonce")
-		.description("Generate a proof nonce")
-		.option("--config <file>", "Read full issuer config JSON from file")
-		.option(
-			"--issuer <url>",
-			"Override issuer identifier or build config inline",
-		)
-		.option(
-			"--signing-key-file <file>",
-			"Read signing key JSON or trust material JSON from file",
-		)
-		.option(
-			"--credential-configuration-id <id>",
-			"Credential configuration id for inline config",
-		)
-		.option("--vct <vct>", "Credential type for inline config")
-		.option("--output <format>", "Output format: json|pretty", "pretty")
-		.action(async (options) => {
-			printResult(await nonceAction(options), options.output);
+			verbose(`Initializing issuer in ${options.issuerDir}`);
+			printResult(await initIssuerAction(options), "json");
 		});
 
 	program
 		.command("issue")
 		.description(
-			"Issue a holder-bound dc+sd-jwt credential from claims and proof input",
+			"Issue a dc+sd-jwt credential and write it to the issuer directory",
 		)
-		.option("--config <file>", "Read full issuer config JSON from file")
-		.option(
+		.requiredOption(
+			"--issuer-dir <dir>",
+			"Path to the issuer directory containing signing-key.json",
+		)
+		.requiredOption(
 			"--issuer <url>",
-			"Override issuer identifier or build config inline",
+			"Issuer identifier URL (e.g. https://issuer.example)",
 		)
-		.option(
-			"--signing-key-file <file>",
-			"Read signing key JSON or trust material JSON from file",
-		)
-		.option("--credential-configuration-id <id>", "Credential configuration id")
-		.option("--vct <vct>", "Resolve credential configuration by vct")
-		.option(
-			"--access-token <token>",
-			"Use an already-derived access token in the current issuer instance",
+		.requiredOption(
+			"--vct <uri>",
+			"Verifiable Credential Type URI (e.g. urn:eudi:pid:1)",
 		)
 		.option(
 			"--claims <json>",
-			"Inline claim-set JSON for grant-derived issuance",
+			'Inline JSON object with credential claims (e.g. \'{"given_name":"Ada"}\')',
 		)
 		.option(
 			"--claims-file <file>",
-			"Read claim-set JSON from file for grant-derived issuance",
+			"Path to a JSON file containing credential claims",
 		)
-		.option("--proof <value>", "Inline proof JWT or proof JSON")
-		.option("--proof-file <file>", "Read proof JWT or proof JSON from file")
-		.option("--output <format>", "Output format: json|pretty|raw", "pretty")
+		.option(
+			"--holder-key-file <file>",
+			"Path to the wallet holder-key.json for holder binding (omit for unbound credentials)",
+		)
+		.option(
+			"--holder-key <json>",
+			"Inline holder key JWK JSON for holder binding (alternative to --holder-key-file)",
+		)
+		.option(
+			"--credential-file <name>",
+			"Output credential filename within --issuer-dir (default: credential-<uuid>.txt)",
+		)
+		.option(
+			"--signing-key-file <file>",
+			"Path to a signing key JSON file (overrides the one in --issuer-dir)",
+		)
+		.option(
+			"--output <format>",
+			"Output format: json or raw (compact credential text only)",
+			"json",
+		)
+		.addHelpText(
+			"after",
+			`
+Examples:
+  Issue an unbound credential:
+    $ issuer-cli issue \
+        --issuer-dir ./my-issuer \
+        --issuer https://issuer.example \
+        --vct urn:eudi:pid:1 \
+        --claims-file claims.json
+
+  Issue a holder-bound credential:
+    $ issuer-cli issue \
+        --issuer-dir ./my-issuer \
+        --issuer https://issuer.example \
+        --vct urn:eudi:pid:1 \
+        --claims-file claims.json \
+        --holder-key-file ./wallet/holder-key.json
+
+  Issue a holder-bound credential with inline holder key:
+    $ issuer-cli issue \
+        --issuer-dir ./my-issuer \
+        --issuer https://issuer.example \
+        --vct urn:eudi:pid:1 \
+        --claims-file claims.json \
+        --holder-key '{"kty":"EC","crv":"P-256",...}'`,
+		)
 		.action(async (options) => {
+			verbose(`Issuing credential to ${options.issuerDir}`);
 			const result = await issueCredentialAction(options);
 			if (options.output === "raw") {
 				process.stdout.write(`${result.credential}\n`);
@@ -145,25 +126,82 @@ export function createProgram(): Command {
 		.description(
 			"Generate demo issuer key material, JWKS, and self-signed certificate artifacts",
 		)
-		.option("--kid <kid>", "Key id")
+		.option(
+			"--issuer-dir <dir>",
+			"Write default output files (signing-key.json, jwks.json, trust.json) to this directory",
+		)
+		.option(
+			"--kid <kid>",
+			"Key id for the generated key pair (default: issuer-key-1)",
+		)
+		.option(
+			"--alg <algorithm>",
+			"Signing algorithm: ES256, ES384, or EdDSA (default: EdDSA)",
+		)
 		.option(
 			"--subject <subject>",
-			"OpenSSL subject for self-signed certificate",
+			"OpenSSL subject for the self-signed certificate (default: /CN=Demo Issuer/O=oid4vp-cli-utils)",
 		)
-		.option("--days-valid <days>", "Certificate validity in days")
-		.option("--private-jwk-out <file>", "Write private JWK JSON")
-		.option("--public-jwk-out <file>", "Write public JWK JSON")
-		.option("--jwks-out <file>", "Write JWKS JSON")
-		.option("--private-key-pem-out <file>", "Write private key PEM")
-		.option("--public-key-pem-out <file>", "Write public key PEM")
-		.option("--certificate-out <file>", "Write self-signed certificate PEM")
 		.option(
-			"--trust-artifact-out <file>",
-			"Write verifier-facing trust artifact JSON",
+			"--days-valid <days>",
+			"Certificate validity in days (default: 365)",
 		)
-		.option("--output <format>", "Output format: json|pretty", "pretty")
+		.addHelpText(
+			"after",
+			`
+Examples:
+  $ issuer-cli generate-trust-material --issuer-dir ./my-issuer`,
+		)
 		.action(async (options) => {
-			printResult(await generateTrustMaterialAction(options), options.output);
+			verbose("Generating trust material");
+			printResult(await generateTrustMaterialAction(options), "json");
+		});
+
+	program
+		.command("import-trust-material")
+		.description(
+			"Import existing key material and produce issuer signing-key, JWKS, and trust artifacts",
+		)
+		.requiredOption(
+			"--issuer-dir <dir>",
+			"Output directory for signing-key.json, jwks.json, and trust.json",
+		)
+		.requiredOption(
+			"--private-key <file>",
+			"Path to private key file (JWK JSON or PKCS#8 PEM, auto-detected)",
+		)
+		.option(
+			"--certificate <file>",
+			"Path to PEM certificate file (if omitted, a self-signed certificate is generated)",
+		)
+		.option(
+			"--alg <algorithm>",
+			"Signing algorithm: ES256, ES384, or EdDSA (inferred from key if omitted)",
+		)
+		.addHelpText(
+			"after",
+			`
+Examples:
+  Import a PEM private key (generates self-signed certificate):
+    $ issuer-cli import-trust-material \\
+        --issuer-dir ./my-issuer \\
+        --private-key ./private-key.pem
+
+  Import a JWK private key with existing certificate:
+    $ issuer-cli import-trust-material \\
+        --issuer-dir ./my-issuer \\
+        --private-key ./private-key.json \\
+        --certificate ./cert.pem
+
+  Import with explicit algorithm:
+    $ issuer-cli import-trust-material \\
+        --issuer-dir ./my-issuer \\
+        --private-key ./key.pem \\
+        --alg ES256`,
+		)
+		.action(async (options) => {
+			verbose("Importing trust material");
+			printResult(await importTrustMaterialAction(options), "json");
 		});
 
 	return program;

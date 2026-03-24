@@ -15,6 +15,7 @@ import {
 } from "./crypto.ts";
 import {
 	type HolderKeyRecord,
+	HolderKeyRecordSchema,
 	type ImportCredentialInput,
 	ImportCredentialInputSchema,
 	type IssuerKeyMaterial,
@@ -81,15 +82,39 @@ export type CreatePresentationResult = {
 export class Wallet {
 	constructor(private readonly storage: WalletStorage) {}
 
-	async getOrCreateHolderKey(): Promise<HolderKeyRecord> {
+	async getOrCreateHolderKey(
+		alg?: HolderKeyRecord["algorithm"],
+	): Promise<HolderKeyRecord> {
 		const existing = await this.storage.getHolderKey();
 		if (existing) {
 			return existing;
 		}
 
-		const created = await createHolderKeyRecord();
+		const created = await createHolderKeyRecord(alg);
 		await this.storage.setHolderKey(created);
 		return created;
+	}
+
+	async importHolderKey(input: {
+		privateJwk: Record<string, unknown>;
+		publicJwk: Record<string, unknown>;
+		algorithm: string;
+	}): Promise<HolderKeyRecord> {
+		const existing = await this.storage.getHolderKey();
+		if (existing) {
+			throw new WalletError("Holder key already exists in this wallet");
+		}
+		const id = await getJwkThumbprint(input.publicJwk as JWK);
+		const record: HolderKeyRecord = {
+			id,
+			algorithm: input.algorithm as HolderKeyRecord["algorithm"],
+			publicJwk: input.publicJwk,
+			privateJwk: input.privateJwk,
+			createdAt: new Date().toISOString(),
+		};
+		HolderKeyRecordSchema.parse(record);
+		await this.storage.setHolderKey(record);
+		return record;
 	}
 
 	async listCredentials(): Promise<StoredCredentialRecord[]> {
@@ -101,8 +126,8 @@ export class Wallet {
 	} {
 		return {
 			"dc+sd-jwt": {
-				sd_jwt_alg_values: [HOLDER_KEY_ALG],
-				kb_jwt_alg_values: [HOLDER_KEY_ALG],
+				sd_jwt_alg_values: ["ES256", "ES384", "EdDSA"],
+				kb_jwt_alg_values: ["ES256", "ES384", "EdDSA"],
 			},
 		};
 	}
@@ -126,17 +151,35 @@ export class Wallet {
 			throw new WalletError("Unsupported credential typ");
 		}
 
-		const verificationKey = await resolveIssuerVerificationKey(
-			parsedInput.issuer,
-			header.kid,
-			header.alg,
-		);
-		const verified = await jwtVerify(split.jwt, verificationKey, {
-			issuer: parsedInput.issuer.issuer,
-			typ: "dc+sd-jwt",
-		});
+		let payload: Record<string, unknown>;
+		if (parsedInput.issuer) {
+			const verificationKey = await resolveIssuerVerificationKey(
+				parsedInput.issuer,
+				header.kid,
+				header.alg,
+			);
+			const verified = await jwtVerify(split.jwt, verificationKey, {
+				issuer: parsedInput.issuer.issuer,
+				typ: "dc+sd-jwt",
+			});
+			payload = verified.payload as Record<string, unknown>;
+		} else {
+			const jwtPart = split.jwt.split(".")[1];
+			if (!jwtPart) {
+				throw new WalletError("Invalid credential format");
+			}
+			const decodedPayload = JSON.parse(
+				Buffer.from(jwtPart, "base64url").toString("utf8"),
+			) as { iss?: unknown };
+			if (
+				typeof decodedPayload.iss !== "string" ||
+				decodedPayload.iss.length === 0
+			) {
+				throw new WalletError("Credential is missing issuer");
+			}
+			payload = decodedPayload;
+		}
 
-		const payload = verified.payload as Record<string, unknown>;
 		const vct = readStringClaim(payload.vct, "Credential is missing vct");
 		const issuer = readStringClaim(payload.iss, "Credential is missing iss");
 		const cnf = readRecordClaim(payload.cnf, "Credential is missing cnf");

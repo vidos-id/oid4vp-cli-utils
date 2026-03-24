@@ -20,9 +20,24 @@
         "typescript": "^5.9.3",
       },
     },
+    "packages/cli-common": {
+      "name": "cli-common",
+      "version": "0.0.0",
+      "dependencies": {
+        "commander": "^14.0.3",
+        "zod": "^4.3.6",
+      },
+    },
     "packages/issuer": {
       "name": "issuer",
       "version": "0.0.0",
+      "dependencies": {
+        "@sd-jwt/core": "^0.19.0",
+        "@sd-jwt/hash": "^0.19.0",
+        "@sd-jwt/sd-jwt-vc": "^0.19.0",
+        "jose": "^6.2.2",
+        "zod": "^4.3.6",
+      },
     },
     "packages/issuer-cli": {
       "name": "issuer-cli",
@@ -31,7 +46,10 @@
         "issuer-cli": "./src/index.ts",
       },
       "dependencies": {
+        "cli-common": "workspace:*",
+        "commander": "^14.0.3",
         "issuer": "workspace:*",
+        "zod": "^4.3.6",
       },
     },
     "packages/wallet": {
@@ -45,7 +63,10 @@
         "wallet-cli": "./src/index.ts",
       },
       "dependencies": {
+        "cli-common": "workspace:*",
+        "commander": "^14.0.3",
         "wallet": "workspace:*",
+        "zod": "^4.3.6",
       },
     },
   },
@@ -73,6 +94,8 @@
     "@types/node": ["@types/node@25.5.0", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-jp2P3tQMSxWugkCUKLRPVUpGaL5MVFwF8RDuSRztfwgN1wmqJeMSbKlnEtQqU8UrhTmzEmZdu2I6v2dpp7XIxw=="],
 
     "bun-types": ["bun-types@1.3.11", "", { "dependencies": { "@types/node": "*" } }, "sha512-1KGPpoxQWl9f6wcZh57LvrPIInQMn2TQ7jsgxqpRzg+l0QPOFvJVH7HmvHo/AiPgwXy+/Thf6Ov3EdVn1vOabg=="],
+
+    "cli-common": ["cli-common@workspace:packages/cli-common"],
 
     "commander": ["commander@14.0.3", "", {}, "sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw=="],
 

@@ -118,6 +118,8 @@ describe("token exchange and issuance", () => {
 		expect(issued.format).toBe("dc+sd-jwt");
 		const parsed = await issuer.parseIssuedCredential(issued.credential);
 		expect(parsed.header?.typ).toBe("dc+sd-jwt");
+		expect(parsed.header?.kid).toBe("issuer-key-1");
+		expect(Array.isArray(parsed.header?.x5c)).toBe(true);
 		expect(parsed.payload?.vct).toBe(
 			"https://issuer.example/credentials/employee-card",
 		);
@@ -128,6 +130,69 @@ describe("token exchange and issuance", () => {
 		).getClaims<Record<string, unknown>>(hasher);
 		expect(reconstructed.given_name).toBe("Ada");
 		expect(reconstructed.family_name).toBe("Lovelace");
+	});
+
+	test("ignores reserved claims from caller-provided claim sets", async () => {
+		const { issuer } = await createTestIssuer();
+		issuer.createCredentialOffer({
+			credential_configuration_id: "employee_card",
+			claims: {
+				vct: "urn:eudi:pid:1",
+				iss: "https://wrong.example",
+				given_name: "Ada",
+				family_name: "Lovelace",
+			},
+		});
+		const tokenResponse = issuer.exchangePreAuthorizedCode({
+			grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+			"pre-authorized_code": "grant-code-1",
+		});
+		const nonce = issuer.createNonce();
+		const proof = await createProofJwt({
+			aud: "https://issuer.example",
+			nonce: nonce.c_nonce,
+		});
+		const issued = await issuer.issueCredential({
+			access_token: tokenResponse.access_token,
+			credential_configuration_id: "employee_card",
+			proof: { proof_type: "jwt", jwt: proof.jwt },
+		});
+
+		const parsed = await issuer.parseIssuedCredential(issued.credential);
+		expect(parsed.payload?.iss).toBe("https://issuer.example");
+		expect(parsed.payload?.vct).toBe(
+			"https://issuer.example/credentials/employee-card",
+		);
+		const reconstructed = await (
+			await SDJwt.fromEncode(issued.credential, hasher)
+		).getClaims<Record<string, unknown>>(hasher);
+		expect(reconstructed.given_name).toBe("Ada");
+		expect(reconstructed.vct).toBe(
+			"https://issuer.example/credentials/employee-card",
+		);
+	});
+
+	test("issues without cnf when proof is omitted", async () => {
+		const { issuer } = await createTestIssuer();
+		issuer.createCredentialOffer({
+			credential_configuration_id: "employee_card",
+			claims: { given_name: "Ada" },
+		});
+		const tokenResponse = issuer.exchangePreAuthorizedCode({
+			grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+			"pre-authorized_code": "grant-code-1",
+		});
+		const issued = await issuer.issueCredential({
+			access_token: tokenResponse.access_token,
+			credential_configuration_id: "employee_card",
+		});
+
+		const parsed = await issuer.parseIssuedCredential(issued.credential);
+		expect(parsed.payload?.cnf).toBeUndefined();
+		const reconstructed = await (
+			await SDJwt.fromEncode(issued.credential, hasher)
+		).getClaims<Record<string, unknown>>(hasher);
+		expect(reconstructed.given_name).toBe("Ada");
 	});
 
 	test("rejects tx_code and invalid proof audience", async () => {
@@ -173,6 +238,7 @@ describe("trust material generation", () => {
 		expect(trust.privateKeyPem).toContain("BEGIN PRIVATE KEY");
 		expect(trust.certificatePem).toContain("BEGIN CERTIFICATE");
 		expect(trust.jwks.keys[0]?.kid).toBe("issuer-key-1");
+		expect(Array.isArray(trust.jwks.keys[0]?.x5c)).toBe(true);
 		expect(
 			trust.trustArtifact.certificateFingerprintSha256.length,
 		).toBeGreaterThan(10);

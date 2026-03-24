@@ -26,8 +26,11 @@ export const credentialConfigurationSchema = z.object({
 	claims: z.record(z.string(), z.unknown()).optional(),
 	proof_signing_alg_values_supported: z
 		.array(z.string().min(1))
-		.default(["EdDSA", "ES256"]),
+		.default(["ES256", "ES384", "EdDSA"]),
 });
+
+export const signingAlgSchema = z.enum(["ES256", "ES384", "EdDSA"]);
+export type SigningAlg = z.infer<typeof signingAlgSchema>;
 
 export const issuerConfigSchema = z.object({
 	issuer: z.string().url(),
@@ -38,7 +41,7 @@ export const issuerConfigSchema = z.object({
 			"At least one credential configuration is required",
 		),
 	signingKey: z.object({
-		alg: z.literal("EdDSA").default("EdDSA"),
+		alg: signingAlgSchema.default("EdDSA"),
 		privateJwk: jwkSchema,
 		publicJwk: jwkSchema,
 	}),
@@ -77,7 +80,8 @@ export const proofObjectSchema = z.object({
 export const credentialRequestSchema = z.object({
 	access_token: z.string().min(1),
 	credential_configuration_id: z.string().min(1),
-	proof: proofObjectSchema,
+	proof: proofObjectSchema.optional(),
+	holderPublicJwk: jwkSchema.optional(),
 });
 
 export const nonceValidationSchema = z.object({

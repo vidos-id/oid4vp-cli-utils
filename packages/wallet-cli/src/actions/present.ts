@@ -1,22 +1,22 @@
 import { createInterface } from "node:readline/promises";
+import { verbose } from "cli-common";
 import {
+	createOpenId4VpAuthorizationResponse,
 	type OpenId4VpRequestInput,
-	OpenId4VpRequestSchema,
-	parseOid4VpAuthorizationUrl,
+	parseOpenid4VpAuthorizationUrl,
 	type QueryCredentialMatches,
+	resolveOpenId4VpRequest,
+	submitOpenId4VpAuthorizationResponse,
 	Wallet,
 	type WalletStorage,
 } from "wallet";
-import { readTextInput } from "../io.ts";
 import { presentOptionsSchema } from "../schemas.ts";
 import { SelectedCredentialStorage } from "../selected-storage.ts";
 import { FileSystemWalletStorage } from "../storage.ts";
 
 export async function presentCredentialAction(rawOptions: unknown) {
 	const options = presentOptionsSchema.parse(rawOptions);
-	const request = parsePresentationRequest(
-		await readTextInput(options.request, options.requestFile),
-	);
+	const request = await parsePresentationRequest(options.request);
 	const storage = new FileSystemWalletStorage(options.walletDir);
 	const wallet = options.credentialId
 		? await createSelectedWallet(storage, options.credentialId)
@@ -31,20 +31,39 @@ export async function presentCredentialAction(rawOptions: unknown) {
 	const presentation = await wallet.createPresentation(request, {
 		selectedCredentials,
 	});
-	return presentation;
+	const authorizationResponse = createOpenId4VpAuthorizationResponse(
+		request,
+		presentation,
+	);
+	const submission =
+		!options.dryRun &&
+		(request.response_mode === "direct_post" ||
+			request.response_mode === "direct_post.jwt")
+			? await submitOpenId4VpAuthorizationResponse(
+					request,
+					authorizationResponse,
+				)
+			: undefined;
+	return {
+		...presentation,
+		submitted: submission !== undefined,
+		submission,
+	};
 }
 
 type CredentialPrompt = (queryMatch: QueryCredentialMatches) => Promise<string>;
 
-function parsePresentationRequest(value: string): OpenId4VpRequestInput {
+async function parsePresentationRequest(
+	value: string,
+): Promise<OpenId4VpRequestInput> {
 	const trimmed = value.trim();
-	if (trimmed.startsWith("oid4vp:")) {
-		return parseOid4VpAuthorizationUrl(trimmed);
+	if (trimmed.startsWith("openid4vp:")) {
+		verbose("Parsing openid4vp:// authorization URL");
+		return parseOpenid4VpAuthorizationUrl(trimmed);
 	}
 
-	return OpenId4VpRequestSchema.parse(
-		JSON.parse(trimmed) as OpenId4VpRequestInput,
-	);
+	verbose("Parsing inline OpenID4VP request JSON");
+	return resolveOpenId4VpRequest(JSON.parse(trimmed) as OpenId4VpRequestInput);
 }
 
 async function maybeSelectCredentials(
@@ -75,21 +94,24 @@ async function promptForCredentialSelection(
 	queryMatch: QueryCredentialMatches,
 ): Promise<string> {
 	if (!process.stdin.isTTY || !process.stdout.isTTY) {
+		const candidates = queryMatch.credentials
+			.map((c) => `  ${c.credentialId} (${c.vct}, ${c.issuer})`)
+			.join("\n");
 		throw new Error(
-			`Multiple credentials match query ${queryMatch.queryId}; rerun in a terminal or pass --credential-id`,
+			`Multiple credentials match query "${queryMatch.queryId}":\n${candidates}\n\nRerun with --credential-id to select one, for example:\n  wallet-cli present --wallet-dir <dir> --request <value> --credential-id ${queryMatch.credentials[0]?.credentialId ?? "<id>"}`,
 		);
 	}
 
-	process.stdout.write(
+	process.stderr.write(
 		`Multiple credentials match query ${queryMatch.queryId}:\n`,
 	);
 	for (const [index, credential] of queryMatch.credentials.entries()) {
-		process.stdout.write(
+		process.stderr.write(
 			`${index + 1}. ${credential.credentialId} | ${credential.vct} | ${credential.issuer} | ${formatClaimPreview(credential.claims)}\n`,
 		);
 	}
 
-	const rl = createInterface({ input: process.stdin, output: process.stdout });
+	const rl = createInterface({ input: process.stdin, output: process.stderr });
 	try {
 		while (true) {
 			const answer = (
@@ -102,7 +124,7 @@ async function promptForCredentialSelection(
 			if (selected) {
 				return selected.credentialId;
 			}
-			process.stdout.write("Enter a valid number.\n");
+			process.stderr.write("Enter a valid number.\n");
 		}
 	} finally {
 		rl.close();
