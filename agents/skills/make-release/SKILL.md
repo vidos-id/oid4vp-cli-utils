@@ -98,7 +98,7 @@ Also verify the GitHub Packages publish succeeded for:
 Important notes for this repository:
 
 - packages are intentionally published as raw TypeScript right now, not prebuilt JS
-- packages are published via Bun using the `GITHUB_PACKAGES_TOKEN` secret exposed as `NPM_CONFIG_TOKEN` in CI
+- packages are published via Bun using the `NPM_CONFIG_TOKEN` secret exposed as `NPM_CONFIG_TOKEN` in CI
 - consumers still need GitHub Packages auth and an `.npmrc` or `bunfig.toml` entry for the `@vidos-id` scope, even when the packages are public
 
 ### 7. Version bump decision

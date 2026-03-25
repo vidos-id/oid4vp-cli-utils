@@ -29,7 +29,7 @@ jobs:
 
       - name: Publish GitHub Packages
         env:
-          NPM_CONFIG_TOKEN: ${{ secrets.GITHUB_PACKAGES_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_CONFIG_TOKEN }}
         run: |
           bun publish --cwd packages/cli-common
           bun publish --cwd packages/wallet
