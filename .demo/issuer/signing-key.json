@@ -1,0 +1,23 @@
+{
+	"alg": "EdDSA",
+	"privateJwk": {
+		"kty": "OKP",
+		"kid": "issuer-key-1",
+		"alg": "EdDSA",
+		"crv": "Ed25519",
+		"x": "hZunn11awlhkpaAIxCiDe4H3BiKP73uti9QGT3v_TCc",
+		"d": "uVuOzfJPgH1N0Luy6TTxw--qSuMLh1Gif0R51KH8Tzo",
+		"use": "sig"
+	},
+	"publicJwk": {
+		"kty": "OKP",
+		"kid": "issuer-key-1",
+		"alg": "EdDSA",
+		"crv": "Ed25519",
+		"x": "hZunn11awlhkpaAIxCiDe4H3BiKP73uti9QGT3v_TCc",
+		"use": "sig",
+		"x5c": [
+			"MIIBdzCCASmgAwIBAgIUEVjegqh4DDl44nxqSAgDcLuUXd8wBQYDK2VwMDExFDASBgNVBAMMC0RlbW8gSXNzdWVyMRkwFwYDVQQKDBBvaWQ0dnAtY2xpLXV0aWxzMB4XDTI2MDMyMzE3MjY1OVoXDTI3MDMyMzE3MjY1OVowMTEUMBIGA1UEAwwLRGVtbyBJc3N1ZXIxGTAXBgNVBAoMEG9pZDR2cC1jbGktdXRpbHMwKjAFBgMrZXADIQCFm6efXVrCWGSloAjEKIN7gfcGIo/ve62L1AZPe/9MJ6NTMFEwHQYDVR0OBBYEFEIRQMIbfWVL3q+SfeyWDuh9eLAOMB8GA1UdIwQYMBaAFEIRQMIbfWVL3q+SfeyWDuh9eLAOMA8GA1UdEwEB/wQFMAMBAf8wBQYDK2VwA0EADUMk/wPNbDT+1/V/oleRJJL+gGqbdMW5QlHGVsbQeKHc2veq535FuEJvTklYckfsDOTCKlSXev+C14nB7RifBA=="
+		]
+	}
+}

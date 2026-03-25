@@ -1,0 +1,13 @@
+{
+	"version": 1,
+	"credentials": [
+		{
+			"id": "NugVvgO129TBmYclpTlQfYbd-x31S-NHxaDL5MXM7jM",
+			"fileName": "NugVvgO129TBmYclpTlQfYbd-x31S-NHxaDL5MXM7jM.json",
+			"issuer": "https://issuer.example",
+			"vct": "urn:eudi:pid:1",
+			"importedAt": "2026-03-23T17:28:30.494Z"
+		}
+	],
+	"updatedAt": "2026-03-23T17:28:30.496Z"
+}

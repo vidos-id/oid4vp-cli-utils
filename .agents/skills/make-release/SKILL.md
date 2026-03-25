@@ -11,21 +11,42 @@ This skill walks through creating a versioned GitHub release for this monorepo. 
 
 ### 1. Determine the next version
 
-Read the current version from the root `package.json`. This is the version that will be released (it should already reflect what you're about to ship).
+Read the current version from the root `package.json` and find the last released tag:
 
-### 2. Analyze changes since the last release
+```bash
+git tag --list 'v*' --sort=-v:refname | head -5
+```
 
-Run `git log --oneline` from the last tag to HEAD to see what's changed. Look at the commit messages and classify them:
+### 2. Analyze changes and suggest version bump
+
+Run the full commit log since the last tag:
+
+```bash
+git log <last_tag>..HEAD --format="%s%n%b---" --no-merges
+```
+
+Classify the changes:
 
 - **patch** (0.0.x): bug fixes, docs, refactors, dependency updates, chore
 - **minor** (0.x.0): new features, new CLI commands, new options, non-breaking API additions
 - **major** (x.0.0): breaking changes to CLI interface (renamed/removed commands or flags), breaking changes to library APIs, dropped compatibility
 
-Compare this against the version bump implied by the current version in `package.json` relative to the last released tag. If the changes suggest a bigger bump is needed (e.g., there's a breaking change but the version only bumped the patch), flag this to the developer and ask for confirmation before proceeding.
+Based on this analysis, suggest whether the bump should be **patch**, **minor**, or **major**. Present this recommendation to the developer and ask for confirmation before proceeding.
 
-### 2.1 Generate AI release notes
+### 3. Apply the version bump
 
-Read the full commit messages (not just oneline) for all commits since the last tag:
+After confirming the bump type, update the version in all `package.json` files:
+
+- `package.json` (root)
+- `packages/cli-common/package.json`
+- `packages/issuer/package.json`
+- `packages/issuer-cli/package.json`
+- `packages/wallet/package.json`
+- `packages/wallet-cli/package.json`
+
+### 4. Generate release notes
+
+Read the full commit messages for all commits since the last tag:
 
 ```bash
 git log <last_tag>..HEAD --format="%s%n%b---" --no-merges
@@ -39,7 +60,7 @@ Then generate a human-readable changelog overview in markdown format with sectio
 
 Write the generated notes to `.release_notes.md` in the repo root. These will be used by the release workflow.
 
-### 3. Pre-release checks
+### 5. Pre-release checks
 
 Before tagging, verify the codebase is healthy:
 
@@ -66,19 +87,7 @@ Before releasing, confirm the package metadata is publishable:
 - each package points `publishConfig.registry` to `https://npm.pkg.github.com`
 - each package includes the repo URL in its `repository` field
 
-### 4. Ensure versions are consistent
-
-All `package.json` files in the monorepo should have the same version. Check:
-- `package.json` (root)
-- `packages/cli-common/package.json`
-- `packages/issuer/package.json`
-- `packages/issuer-cli/package.json`
-- `packages/wallet/package.json`
-- `packages/wallet-cli/package.json`
-
-If they're out of sync, align them to the release version before proceeding.
-
-### 5. Tag and push
+### 6. Tag and push
 
 Create the git tag and push it. This triggers the release workflow in CI:
 
@@ -87,7 +96,7 @@ git tag v<version>
 git push origin v<version>
 ```
 
-### 6. Verify the release and package publish
+### 7. Verify the release and package publish
 
 Check that the GitHub Actions workflow started and completed:
 
@@ -116,9 +125,3 @@ Important notes for this repository:
 - packages are intentionally published as raw TypeScript right now, not prebuilt JS
 - packages are published via Bun using the `NPM_CONFIG_TOKEN` secret exposed as `NPM_CONFIG_TOKEN` in CI
 - consumers still need GitHub Packages auth and an `.npmrc` or `bunfig.toml` entry for the `@vidos-id` scope, even when the packages are public
-
-### 7. Version bump decision
-
-After a successful release, the version in `package.json` represents the version that was just released. There is no need to pre-bump to the next development version -- the version stays as-is until the next release is prepared.
-
-When the developer is ready for the next release, they (or this skill) will bump the version at that point as part of the release preparation.

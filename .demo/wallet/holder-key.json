@@ -1,0 +1,22 @@
+{
+	"id": "n97IikCtmmhUT2uAb6HAK6HaRp5s76SSSXjQh9EnE1Q",
+	"algorithm": "ES256",
+	"publicJwk": {
+		"crv": "P-256",
+		"kty": "EC",
+		"x": "oI2ljXq9d5hy_0ntCKZu6ne94OartvBUtLISWLWFBeo",
+		"y": "Jq0iLq-zg_p1B9k-gHlmbS_tyCmX0eQqXvAhfC5PmFk",
+		"alg": "ES256",
+		"use": "sig"
+	},
+	"privateJwk": {
+		"crv": "P-256",
+		"d": "ea7f4r59rvI9p7PO6MDlYHB8VHCGsrj1_rKIRlly_P0",
+		"kty": "EC",
+		"x": "oI2ljXq9d5hy_0ntCKZu6ne94OartvBUtLISWLWFBeo",
+		"y": "Jq0iLq-zg_p1B9k-gHlmbS_tyCmX0eQqXvAhfC5PmFk",
+		"alg": "ES256",
+		"use": "sig"
+	},
+	"createdAt": "2026-03-23T17:26:56.828Z"
+}
