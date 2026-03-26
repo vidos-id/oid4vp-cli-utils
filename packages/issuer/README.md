@@ -54,8 +54,7 @@ This package implements a deliberately small internal/demo subset of those specs
 ```ts
 import { createIssuer, generateIssuerTrustMaterial } from "@vidos-id/issuer";
 
-// Default algorithm is EdDSA; pass "ES256" or "ES384" for alternatives
-const trust = await generateIssuerTrustMaterial("ES256");
+const trust = await generateIssuerTrustMaterial({ alg: "ES256" });
 
 const issuer = createIssuer({
   issuer: "https://issuer.example",
@@ -75,6 +74,23 @@ const issuer = createIssuer({
 const offer = issuer.createCredentialOffer({
   credential_configuration_id: "person",
   claims: { given_name: "Ada", family_name: "Lovelace" },
+});
+
+await db.saveGrant(offer.preAuthorizedGrant.preAuthorizedCode, offer.preAuthorizedGrant);
+
+const token = issuer.exchangePreAuthorizedCode({
+  tokenRequest: {
+    grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+    "pre-authorized_code": offer.preAuthorizedGrant.preAuthorizedCode,
+  },
+  preAuthorizedGrant: await db.readGrant(offer.preAuthorizedGrant.preAuthorizedCode),
+});
+
+await db.saveAccessToken(token.accessTokenRecord.accessToken, token.accessTokenRecord);
+
+const issued = await issuer.issueCredential({
+  accessToken: await db.readAccessToken(token.accessTokenRecord.accessToken),
+  credential_configuration_id: "person",
 });
 ```
 

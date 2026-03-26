@@ -1,4 +1,7 @@
-import { jsonOutputFormatSchema, outputFormatSchema } from "@vidos-id/cli-common";
+import {
+	jsonOutputFormatSchema,
+	outputFormatSchema,
+} from "@vidos-id/cli-common";
 import {
 	claimSetSchema,
 	issuerConfigSchema,
@@ -23,6 +26,9 @@ export const commonIssuerOptionsSchema = z.object({
 
 export const issueOptionsSchema = commonIssuerOptionsSchema
 	.extend({
+		issuer: z.string().url(),
+		issuerDir: z.string().min(1),
+		vct: z.string().min(1),
 		holderKeyFile: z.string().optional(),
 		holderKey: z.string().optional(),
 		credentialFile: z.string().optional(),

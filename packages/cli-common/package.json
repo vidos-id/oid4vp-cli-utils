@@ -1,7 +1,7 @@
 {
 	"name": "@vidos-id/cli-common",
 	"description": "Shared CLI utilities for the oid4vp-cli-utils packages.",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/vidos-id/oid4vp-cli-utils.git"

@@ -66,26 +66,48 @@ export const createPreAuthorizedGrantInputSchema = z.object({
 export const createCredentialOfferInputSchema =
 	createPreAuthorizedGrantInputSchema;
 
+export const preAuthorizedGrantRecordSchema = z.object({
+	preAuthorizedCode: z.string().min(1),
+	credentialConfigurationId: z.string().min(1),
+	claims: claimSetSchema,
+	expiresAt: z.number().int(),
+	used: z.boolean(),
+});
+
 export const tokenRequestSchema = z.object({
 	grant_type: z.literal("urn:ietf:params:oauth:grant-type:pre-authorized_code"),
 	"pre-authorized_code": z.string().min(1),
 	tx_code: z.string().min(1).optional(),
 });
 
-export const proofObjectSchema = z.object({
-	proof_type: z.literal("jwt"),
-	jwt: z.string().min(1),
+export const exchangePreAuthorizedCodeInputSchema = z.object({
+	tokenRequest: tokenRequestSchema,
+	preAuthorizedGrant: preAuthorizedGrantRecordSchema,
 });
 
-export const credentialRequestSchema = z.object({
-	access_token: z.string().min(1),
+export const accessTokenRecordSchema = z.object({
+	accessToken: z.string().min(1),
+	credentialConfigurationId: z.string().min(1),
+	claims: claimSetSchema,
+	expiresAt: z.number().int(),
+	used: z.boolean(),
+});
+
+export const issueCredentialInputSchema = z.object({
+	accessToken: accessTokenRecordSchema,
 	credential_configuration_id: z.string().min(1),
-	proof: proofObjectSchema.optional(),
 	holderPublicJwk: jwkSchema.optional(),
 });
 
-export const nonceValidationSchema = z.object({
+export const nonceRecordSchema = z.object({
+	c_nonce: z.string().min(1),
+	expiresAt: z.number().int(),
+	used: z.boolean(),
+});
+
+export const validateProofJwtInputSchema = z.object({
 	jwt: z.string().min(1),
+	nonce: nonceRecordSchema,
 });
 
 export type Jwk = z.infer<typeof jwkSchema>;
@@ -101,6 +123,14 @@ export type CreatePreAuthorizedGrantInput = z.input<
 export type CreateCredentialOfferInput = z.input<
 	typeof createCredentialOfferInputSchema
 >;
+export type PreAuthorizedGrantRecord = z.infer<
+	typeof preAuthorizedGrantRecordSchema
+>;
 export type TokenRequest = z.input<typeof tokenRequestSchema>;
-export type CredentialRequest = z.input<typeof credentialRequestSchema>;
-export type NonceValidationInput = z.input<typeof nonceValidationSchema>;
+export type ExchangePreAuthorizedCodeInput = z.input<
+	typeof exchangePreAuthorizedCodeInputSchema
+>;
+export type AccessTokenRecord = z.infer<typeof accessTokenRecordSchema>;
+export type IssueCredentialInput = z.input<typeof issueCredentialInputSchema>;
+export type NonceRecord = z.infer<typeof nonceRecordSchema>;
+export type ValidateProofJwtInput = z.input<typeof validateProofJwtInputSchema>;

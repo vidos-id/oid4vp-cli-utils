@@ -13,29 +13,7 @@ export async function resolveIssuerConfig(
 ) {
 	const signingKeyFile =
 		options.signingKeyFile ??
-		(options.issuerDir
-			? resolveIssuerDirPaths(options.issuerDir).signingKeyFile
-			: undefined);
-
-	const provided: string[] = [];
-	const missing: string[] = [];
-	if (options.issuer) provided.push("--issuer");
-	else missing.push("--issuer");
-	if (signingKeyFile)
-		provided.push(
-			options.signingKeyFile ? "--signing-key-file" : "--issuer-dir",
-		);
-	else missing.push("--issuer-dir or --signing-key-file");
-	if (options.vct) provided.push("--vct");
-	else missing.push("--vct");
-
-	if (missing.length > 0) {
-		const providedText =
-			provided.length > 0 ? ` You provided ${provided.join(", ")}.` : "";
-		throw new Error(
-			`Missing required options: ${missing.join(", ")}.${providedText}`,
-		);
-	}
+		resolveIssuerDirPaths(options.issuerDir as string).signingKeyFile;
 
 	verbose(
 		`Building inline config: issuer=${options.issuer}, vct=${options.vct}, signingKeyFile=${signingKeyFile}`,

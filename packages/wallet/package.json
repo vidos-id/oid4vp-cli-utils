@@ -1,7 +1,7 @@
 {
 	"name": "@vidos-id/wallet",
 	"description": "Wallet library for dc+sd-jwt storage and OpenID4VP presentation.",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/vidos-id/oid4vp-cli-utils.git"

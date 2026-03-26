@@ -11,9 +11,8 @@ describe("issuer-cli", () => {
 		const tempDir = await mkdtemp(join(tmpdir(), "issuer-cli-"));
 		try {
 			const trust = await generateIssuerTrustMaterial({ kid: "issuer-key-1" });
-			const signingKeyPath = join(tempDir, "signing-key.json");
 			await writeFile(
-				signingKeyPath,
+				join(tempDir, "signing-key.json"),
 				JSON.stringify({
 					alg: trust.alg,
 					privateJwk: trust.privateJwk,
@@ -24,7 +23,7 @@ describe("issuer-cli", () => {
 
 			const result = await issueCredentialAction({
 				issuer: "https://issuer.example",
-				signingKeyFile: signingKeyPath,
+				issuerDir: tempDir,
 				vct: "https://example.com/PersonCredential",
 				claims: JSON.stringify({ given_name: "Ada" }),
 			});
@@ -32,6 +31,7 @@ describe("issuer-cli", () => {
 			expect(result.format).toBe("dc+sd-jwt");
 			expect(result.credential_configuration_id).toBe("credential");
 			expect(result.access_token).toBeString();
+			expect(result.c_nonce).toBeString();
 			expect(result.credential).not.toContain('"cnf"');
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });
@@ -42,9 +42,8 @@ describe("issuer-cli", () => {
 		const tempDir = await mkdtemp(join(tmpdir(), "issuer-cli-"));
 		try {
 			const trust = await generateIssuerTrustMaterial({ kid: "issuer-key-1" });
-			const signingKeyPath = join(tempDir, "signing-key.json");
 			await writeFile(
-				signingKeyPath,
+				join(tempDir, "signing-key.json"),
 				JSON.stringify({
 					alg: trust.alg,
 					privateJwk: trust.privateJwk,
@@ -55,7 +54,7 @@ describe("issuer-cli", () => {
 
 			const result = await issueCredentialAction({
 				issuer: "https://issuer.example",
-				signingKeyFile: signingKeyPath,
+				issuerDir: tempDir,
 				vct: "urn:eudi:pid:1",
 				claimsFile: "examples/pid/pid-minimal.claims.json",
 			});
@@ -63,6 +62,7 @@ describe("issuer-cli", () => {
 			expect(result.format).toBe("dc+sd-jwt");
 			expect(result.credential_configuration_id).toBe("credential");
 			expect(result.access_token).toBeString();
+			expect(result.c_nonce).toBeString();
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });
 		}
@@ -94,6 +94,7 @@ describe("issuer-cli", () => {
 			});
 
 			expect(result.format).toBe("dc+sd-jwt");
+			expect(result.c_nonce).toBeString();
 			const saved = await readFile(
 				join(issuerDir, "my-credential.txt"),
 				"utf8",
@@ -127,6 +128,7 @@ describe("issuer-cli", () => {
 			});
 
 			expect(result.format).toBe("dc+sd-jwt");
+			expect(result.c_nonce).toBeString();
 			const files = await readdir(issuerDir);
 			const credentialFile = files.find(
 				(f: string) => f.startsWith("credential-") && f.endsWith(".txt"),

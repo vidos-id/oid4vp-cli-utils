@@ -86,6 +86,7 @@ describe("issuer metadata and offers", () => {
 				"pre-authorized_code"
 			],
 		).toBe("grant-code-1");
+		expect(offer.preAuthorizedGrant.preAuthorizedCode).toBe("grant-code-1");
 		expect(trust.jwks.keys[0]?.kid).toBe("issuer-key-1");
 	});
 });
@@ -93,13 +94,16 @@ describe("issuer metadata and offers", () => {
 describe("token exchange and issuance", () => {
 	test("exchanges code, validates proof, and issues a holder-bound dc+sd-jwt", async () => {
 		const { issuer } = await createTestIssuer();
-		issuer.createCredentialOffer({
+		const offer = issuer.createCredentialOffer({
 			credential_configuration_id: "employee_card",
 			claims: { given_name: "Ada", family_name: "Lovelace" },
 		});
 		const tokenResponse = issuer.exchangePreAuthorizedCode({
-			grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
-			"pre-authorized_code": "grant-code-1",
+			tokenRequest: {
+				grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+				"pre-authorized_code": "grant-code-1",
+			},
+			preAuthorizedGrant: offer.preAuthorizedGrant,
 		});
 		expect(tokenResponse.access_token).toBe("access-token-1");
 
@@ -109,13 +113,19 @@ describe("token exchange and issuance", () => {
 			aud: "https://issuer.example",
 			nonce: nonce.c_nonce,
 		});
+		const validatedProof = await issuer.validateProofJwt({
+			jwt: proof.jwt,
+			nonce: nonce.nonce,
+		});
 		const issued = await issuer.issueCredential({
-			access_token: tokenResponse.access_token,
+			accessToken: tokenResponse.accessTokenRecord,
 			credential_configuration_id: "employee_card",
-			proof: { proof_type: "jwt", jwt: proof.jwt },
+			proof: validatedProof,
 		});
 
 		expect(issued.format).toBe("dc+sd-jwt");
+		expect(issued.updatedAccessToken.used).toBe(true);
+		expect(issued.nonce.c_nonce).toBe("issued-nonce-1");
 		const parsed = await issuer.parseIssuedCredential(issued.credential);
 		expect(parsed.header?.typ).toBe("dc+sd-jwt");
 		expect(parsed.header?.kid).toBe("issuer-key-1");
@@ -134,7 +144,7 @@ describe("token exchange and issuance", () => {
 
 	test("ignores reserved claims from caller-provided claim sets", async () => {
 		const { issuer } = await createTestIssuer();
-		issuer.createCredentialOffer({
+		const offer = issuer.createCredentialOffer({
 			credential_configuration_id: "employee_card",
 			claims: {
 				vct: "urn:eudi:pid:1",
@@ -144,18 +154,25 @@ describe("token exchange and issuance", () => {
 			},
 		});
 		const tokenResponse = issuer.exchangePreAuthorizedCode({
-			grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
-			"pre-authorized_code": "grant-code-1",
+			tokenRequest: {
+				grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+				"pre-authorized_code": "grant-code-1",
+			},
+			preAuthorizedGrant: offer.preAuthorizedGrant,
 		});
 		const nonce = issuer.createNonce();
 		const proof = await createProofJwt({
 			aud: "https://issuer.example",
 			nonce: nonce.c_nonce,
 		});
+		const validatedProof = await issuer.validateProofJwt({
+			jwt: proof.jwt,
+			nonce: nonce.nonce,
+		});
 		const issued = await issuer.issueCredential({
-			access_token: tokenResponse.access_token,
+			accessToken: tokenResponse.accessTokenRecord,
 			credential_configuration_id: "employee_card",
-			proof: { proof_type: "jwt", jwt: proof.jwt },
+			proof: validatedProof,
 		});
 
 		const parsed = await issuer.parseIssuedCredential(issued.credential);
@@ -174,16 +191,19 @@ describe("token exchange and issuance", () => {
 
 	test("issues without cnf when proof is omitted", async () => {
 		const { issuer } = await createTestIssuer();
-		issuer.createCredentialOffer({
+		const offer = issuer.createCredentialOffer({
 			credential_configuration_id: "employee_card",
 			claims: { given_name: "Ada" },
 		});
 		const tokenResponse = issuer.exchangePreAuthorizedCode({
-			grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
-			"pre-authorized_code": "grant-code-1",
+			tokenRequest: {
+				grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+				"pre-authorized_code": "grant-code-1",
+			},
+			preAuthorizedGrant: offer.preAuthorizedGrant,
 		});
 		const issued = await issuer.issueCredential({
-			access_token: tokenResponse.access_token,
+			accessToken: tokenResponse.accessTokenRecord,
 			credential_configuration_id: "employee_card",
 		});
 
@@ -197,21 +217,27 @@ describe("token exchange and issuance", () => {
 
 	test("rejects tx_code and invalid proof audience", async () => {
 		const { issuer } = await createTestIssuer();
-		issuer.createCredentialOffer({
+		const offer = issuer.createCredentialOffer({
 			credential_configuration_id: "employee_card",
 			claims: { given_name: "Ada" },
 		});
 		expect(() =>
 			issuer.exchangePreAuthorizedCode({
-				grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
-				"pre-authorized_code": "grant-code-1",
-				tx_code: "1234",
+				tokenRequest: {
+					grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+					"pre-authorized_code": "grant-code-1",
+					tx_code: "1234",
+				},
+				preAuthorizedGrant: offer.preAuthorizedGrant,
 			}),
 		).toThrow(IssuerError);
 
 		const tokenResponse = issuer.exchangePreAuthorizedCode({
-			grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
-			"pre-authorized_code": "grant-code-1",
+			tokenRequest: {
+				grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+				"pre-authorized_code": "grant-code-1",
+			},
+			preAuthorizedGrant: offer.preAuthorizedGrant,
 		});
 		const nonce = issuer.createNonce();
 		const proof = await createProofJwt({
@@ -219,10 +245,9 @@ describe("token exchange and issuance", () => {
 			nonce: nonce.c_nonce,
 		});
 		await expect(
-			issuer.issueCredential({
-				access_token: tokenResponse.access_token,
-				credential_configuration_id: "employee_card",
-				proof: { proof_type: "jwt", jwt: proof.jwt },
+			issuer.validateProofJwt({
+				jwt: proof.jwt,
+				nonce: nonce.nonce,
 			}),
 		).rejects.toThrow();
 	});

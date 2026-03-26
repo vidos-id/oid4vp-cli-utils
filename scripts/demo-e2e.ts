@@ -97,17 +97,22 @@ const grant = issuer.createPreAuthorizedGrant({
 });
 
 const token = issuer.exchangePreAuthorizedCode({
-	grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
-	"pre-authorized_code": grant.preAuthorizedCode,
+	tokenRequest: {
+		grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
+		"pre-authorized_code": grant.preAuthorizedCode,
+	},
+	preAuthorizedGrant: grant.preAuthorizedGrant,
+});
+
+const validatedProof = await issuer.validateProofJwt({
+	jwt: proofJwt,
+	nonce: issuerNonce.nonce,
 });
 
 const issued = await issuer.issueCredential({
-	access_token: token.access_token,
+	accessToken: token.accessTokenRecord,
 	credential_configuration_id: "person",
-	proof: {
-		proof_type: "jwt",
-		jwt: proofJwt,
-	},
+	proof: validatedProof,
 });
 
 const imported = await wallet.importCredential({

@@ -11,20 +11,24 @@ import {
 import { z } from "zod";
 import { IssuerError } from "./errors.ts";
 import {
+	type AccessTokenRecord,
 	type ClaimSet,
 	type CreateCredentialOfferInput,
 	type CreatePreAuthorizedGrantInput,
-	type CredentialRequest,
 	createCredentialOfferInputSchema,
 	createPreAuthorizedGrantInputSchema,
-	credentialRequestSchema,
+	type ExchangePreAuthorizedCodeInput,
+	exchangePreAuthorizedCodeInputSchema,
+	type IssueCredentialInput,
 	type IssuerConfig,
 	type IssuerConfigInput,
+	issueCredentialInputSchema,
 	issuerConfigSchema,
 	jwkSchema,
-	nonceValidationSchema,
-	type TokenRequest,
-	tokenRequestSchema,
+	type NonceRecord,
+	type PreAuthorizedGrantRecord,
+	type ValidateProofJwtInput,
+	validateProofJwtInputSchema,
 } from "./schemas.ts";
 import {
 	cloneJson,
@@ -34,25 +38,6 @@ import {
 	toBase64Url,
 } from "./utils.ts";
 
-type GrantRecord = {
-	credentialConfigurationId: string;
-	claims: ClaimSet;
-	expiresAt: number;
-	used: boolean;
-};
-
-type AccessTokenRecord = {
-	credentialConfigurationId: string;
-	claims: ClaimSet;
-	expiresAt: number;
-	used: boolean;
-};
-
-type NonceRecord = {
-	expiresAt: number;
-	used: boolean;
-};
-
 export type IssuerMetadata = ReturnType<DemoIssuer["getMetadata"]>;
 
 export type ValidatedProof = {
@@ -61,6 +46,7 @@ export type ValidatedProof = {
 	holderKeyThumbprint: string;
 	payload: Record<string, unknown>;
 	protectedHeader: Record<string, unknown>;
+	updatedNonce: NonceRecord;
 };
 
 type IssuanceBinding = {
@@ -141,9 +127,6 @@ export class DemoIssuer {
 	private readonly config: IssuerConfig;
 	private readonly now: () => number;
 	private readonly idGenerator: () => string;
-	private readonly grants = new Map<string, GrantRecord>();
-	private readonly accessTokens = new Map<string, AccessTokenRecord>();
-	private readonly nonces = new Map<string, NonceRecord>();
 	private readonly issuerPrivateKeyPromise: Promise<CryptoKey>;
 	private readonly issuerPublicKeyPromise: Promise<CryptoKey>;
 	private readonly sdJwtVc: Promise<SDJwtVcInstance>;
@@ -250,17 +233,19 @@ export class DemoIssuer {
 		const issuedAt = this.now();
 		const expiresAt =
 			issuedAt + (parsed.expires_in ?? this.config.grantTtlSeconds);
-		this.grants.set(preAuthorizedCode, {
+		const preAuthorizedGrant = {
+			preAuthorizedCode,
 			credentialConfigurationId: parsed.credential_configuration_id,
 			claims: cloneJson(parsed.claims),
 			expiresAt,
 			used: false,
-		});
+		} satisfies PreAuthorizedGrantRecord;
 
 		return {
 			preAuthorizedCode,
 			expiresAt,
 			credential_configuration_id: parsed.credential_configuration_id,
+			preAuthorizedGrant,
 		};
 	}
 
@@ -275,54 +260,79 @@ export class DemoIssuer {
 					"pre-authorized_code": grant.preAuthorizedCode,
 				},
 			},
+			preAuthorizedGrant: grant.preAuthorizedGrant,
 		};
 	}
 
-	exchangePreAuthorizedCode(input: TokenRequest) {
-		const parsed = tokenRequestSchema.parse(input);
-		if (parsed.tx_code) {
+	exchangePreAuthorizedCode(input: ExchangePreAuthorizedCodeInput) {
+		const parsed = exchangePreAuthorizedCodeInputSchema.parse(input);
+		if (parsed.tokenRequest.tx_code) {
 			throw new IssuerError(
 				"unsupported_tx_code",
 				"tx_code is not supported in this demo issuer",
 			);
 		}
-		const record = this.grants.get(parsed["pre-authorized_code"]);
-		if (!record || record.used || record.expiresAt <= this.now()) {
+		if (
+			parsed.preAuthorizedGrant.preAuthorizedCode !==
+			parsed.tokenRequest["pre-authorized_code"]
+		) {
 			throw new IssuerError(
 				"invalid_grant",
 				"Invalid or expired pre-authorized code",
 			);
 		}
-		record.used = true;
+		if (
+			parsed.preAuthorizedGrant.used ||
+			parsed.preAuthorizedGrant.expiresAt <= this.now()
+		) {
+			throw new IssuerError(
+				"invalid_grant",
+				"Invalid or expired pre-authorized code",
+			);
+		}
 		const accessToken = this.idGenerator();
 		const expiresIn = this.config.tokenTtlSeconds;
-		this.accessTokens.set(accessToken, {
-			credentialConfigurationId: record.credentialConfigurationId,
-			claims: cloneJson(record.claims),
+		const updatedPreAuthorizedGrant = {
+			...parsed.preAuthorizedGrant,
+			used: true,
+		} satisfies PreAuthorizedGrantRecord;
+		const accessTokenRecord = {
+			accessToken,
+			credentialConfigurationId:
+				parsed.preAuthorizedGrant.credentialConfigurationId,
+			claims: cloneJson(parsed.preAuthorizedGrant.claims),
 			expiresAt: this.now() + expiresIn,
 			used: false,
-		});
+		} satisfies AccessTokenRecord;
 
 		return {
 			access_token: accessToken,
 			token_type: "Bearer",
 			expires_in: expiresIn,
-			credential_configuration_id: record.credentialConfigurationId,
+			credential_configuration_id:
+				parsed.preAuthorizedGrant.credentialConfigurationId,
+			accessTokenRecord,
+			updatedPreAuthorizedGrant,
 		};
 	}
 
 	createNonce() {
-		const nonce = this.idGenerator();
+		const c_nonce = this.idGenerator();
 		const expiresIn = this.config.nonceTtlSeconds;
-		this.nonces.set(nonce, { expiresAt: this.now() + expiresIn, used: false });
+		const nonce = {
+			c_nonce,
+			expiresAt: this.now() + expiresIn,
+			used: false,
+		} satisfies NonceRecord;
 		return {
-			c_nonce: nonce,
+			c_nonce,
 			c_nonce_expires_in: expiresIn,
+			nonce,
 		};
 	}
 
-	async validateProofJwt(input: { jwt: string }) {
-		const parsed = nonceValidationSchema.parse(input);
+	async validateProofJwt(input: ValidateProofJwtInput) {
+		const parsed = validateProofJwtInputSchema.parse(input);
 		const protectedHeader = decodeProtectedHeader(parsed.jwt) as Record<
 			string,
 			unknown
@@ -367,19 +377,23 @@ export class DemoIssuer {
 			);
 		}
 		const payload = proofPayloadSchema.parse(verified.payload);
-		const holderPublicJwk = embeddedJwk.data;
-		const nonceRecord = this.nonces.get(payload.nonce);
-		if (
-			!nonceRecord ||
-			nonceRecord.used ||
-			nonceRecord.expiresAt <= this.now()
-		) {
+		if (parsed.nonce.c_nonce !== payload.nonce) {
 			throw new IssuerError(
 				"invalid_proof",
 				"Proof JWT nonce is invalid or expired",
 			);
 		}
-		nonceRecord.used = true;
+		if (parsed.nonce.used || parsed.nonce.expiresAt <= this.now()) {
+			throw new IssuerError(
+				"invalid_proof",
+				"Proof JWT nonce is invalid or expired",
+			);
+		}
+		const holderPublicJwk = embeddedJwk.data;
+		const updatedNonce = {
+			...parsed.nonce,
+			used: true,
+		} satisfies NonceRecord;
 
 		return {
 			nonce: payload.nonce,
@@ -387,21 +401,19 @@ export class DemoIssuer {
 			holderKeyThumbprint: await calculateJwkThumbprint(holderPublicJwk as JWK),
 			payload: cloneJson(verified?.payload as Record<string, unknown>),
 			protectedHeader: cloneJson(protectedHeader),
+			updatedNonce,
 		} satisfies ValidatedProof;
 	}
 
-	async issueCredential(input: CredentialRequest) {
-		const parsed = credentialRequestSchema.parse(input);
-		const accessToken = this.accessTokens.get(parsed.access_token);
-		if (
-			!accessToken ||
-			accessToken.used ||
-			accessToken.expiresAt <= this.now()
-		) {
+	async issueCredential(
+		input: IssueCredentialInput & { proof?: ValidatedProof },
+	) {
+		const parsed = issueCredentialInputSchema.parse(input);
+		if (parsed.accessToken.used || parsed.accessToken.expiresAt <= this.now()) {
 			throw new IssuerError("invalid_token", "Invalid or expired access token");
 		}
 		if (
-			accessToken.credentialConfigurationId !==
+			parsed.accessToken.credentialConfigurationId !==
 			parsed.credential_configuration_id
 		) {
 			throw new IssuerError(
@@ -419,10 +431,11 @@ export class DemoIssuer {
 				"Unsupported credential_configuration_id",
 			);
 		}
-		const binding: IssuanceBinding = parsed.proof
-			? await this.validateProofJwt({
-					jwt: parsed.proof.jwt,
-				})
+		const binding: IssuanceBinding = input.proof
+			? {
+					holderPublicJwk: input.proof.holderPublicJwk,
+					holderKeyThumbprint: input.proof.holderKeyThumbprint,
+				}
 			: parsed.holderPublicJwk
 				? {
 						holderPublicJwk: parsed.holderPublicJwk as JWK,
@@ -433,7 +446,9 @@ export class DemoIssuer {
 				: {};
 		const sdJwtVc = await this.sdJwtVc;
 		const issuedAt = this.now();
-		const credentialClaims = sanitizeCredentialClaims(accessToken.claims);
+		const credentialClaims = sanitizeCredentialClaims(
+			parsed.accessToken.claims,
+		);
 		const payload = {
 			iss: this.config.issuer,
 			iat: issuedAt,
@@ -455,11 +470,17 @@ export class DemoIssuer {
 				},
 			},
 		);
-		accessToken.used = true;
+		const nonce = this.createNonce();
+		const updatedAccessToken = {
+			...parsed.accessToken,
+			used: true,
+		} satisfies AccessTokenRecord;
 		return {
 			format: "dc+sd-jwt" as const,
 			credential,
-			c_nonce: this.createNonce().c_nonce,
+			c_nonce: nonce.c_nonce,
+			nonce: nonce.nonce,
+			updatedAccessToken,
 		};
 	}
 
