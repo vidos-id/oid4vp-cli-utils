@@ -46,11 +46,22 @@ export const initOptionsSchema = z.object({
 	holderKeyFile: z.string().optional(),
 });
 
-export const showOptionsSchema = z.object({
-	walletDir: z.string().min(1),
-	credentialId: z.string().min(1),
-	output: outputFormatSchema.default("json"),
-});
+export const showOptionsSchema = z
+	.object({
+		walletDir: z.string().min(1),
+		credentialId: z.string().min(1),
+		resolveStatus: z.boolean().optional().default(false),
+		output: outputFormatSchema.default("json"),
+	})
+	.superRefine((value, ctx) => {
+		if (value.resolveStatus && value.output === "raw") {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: "--resolve-status cannot be used with --output raw",
+				path: ["resolveStatus"],
+			});
+		}
+	});
 
 export const presentOptionsSchema = z.object({
 	walletDir: z.string().min(1),

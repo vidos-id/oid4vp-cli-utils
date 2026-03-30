@@ -19,6 +19,8 @@ import {
 	type ClaimSet,
 	type CreateCredentialOfferInput,
 	type CreatePreAuthorizedGrantInput,
+	type CreateStatusListInput,
+	type CredentialStatus,
 	createCredentialOfferInputSchema,
 	createPreAuthorizedGrantInputSchema,
 	credentialOfferSchema,
@@ -34,9 +36,16 @@ import {
 	jwkSchema,
 	type NonceRecord,
 	type PreAuthorizedGrantRecord,
+	type StatusListRecord,
 	type ValidateProofJwtInput,
 	validateProofJwtInputSchema,
 } from "./schemas.ts";
+import {
+	allocateCredentialStatus,
+	createStatusList,
+	createStatusListJwt,
+	updateCredentialStatus,
+} from "./status-list.ts";
 import {
 	cloneJson,
 	fromBase64Url,
@@ -184,6 +193,38 @@ export class DemoIssuer {
 
 	getMetadata() {
 		return issuerMetadataSchema.parse(createIssuerMetadata(this.config));
+	}
+
+	createStatusList(input: CreateStatusListInput) {
+		return createStatusList(input);
+	}
+
+	allocateCredentialStatus(input: {
+		statusList: StatusListRecord;
+		status?: number;
+	}) {
+		return allocateCredentialStatus(input);
+	}
+
+	updateCredentialStatus(input: {
+		statusList: StatusListRecord;
+		idx: number;
+		status: number;
+	}) {
+		return updateCredentialStatus(input);
+	}
+
+	async createStatusListToken(statusList: StatusListRecord) {
+		return createStatusListJwt({
+			issuer: this.config.issuer,
+			signingKey: {
+				alg: this.config.signingKey.alg,
+				privateKey: await this.issuerPrivateKeyPromise,
+				publicJwk: this.config.signingKey.publicJwk,
+			},
+			statusList,
+			now: this.now,
+		});
 	}
 
 	createPreAuthorizedGrant(input: CreatePreAuthorizedGrantInput) {
@@ -429,6 +470,7 @@ export class DemoIssuer {
 			iss: this.config.issuer,
 			iat: issuedAt,
 			vct: configuration.vct,
+			status: parsed.status ? cloneJson(parsed.status) : undefined,
 			cnf: binding.holderPublicJwk
 				? {
 						jwk: binding.holderPublicJwk,

@@ -1,3 +1,4 @@
+import { inflateSync } from "node:zlib";
 import { decodeSdJwt, getClaims, splitSdJwt } from "@sd-jwt/decode";
 import { present } from "@sd-jwt/present";
 import { DcqlPresentation, DcqlQuery, runDcqlQuery } from "dcql";
@@ -14,6 +15,7 @@ import {
 	sha256Base64Url,
 } from "./crypto.ts";
 import {
+	type CredentialStatus,
 	type HolderKeyRecord,
 	HolderKeyRecordSchema,
 	type ImportCredentialInput,
@@ -79,6 +81,32 @@ export type CreatePresentationResult = {
 	matchedCredentials: MatchedCredential[];
 };
 
+export type TokenStatusLabel =
+	| "VALID"
+	| "INVALID"
+	| "SUSPENDED"
+	| "APPLICATION_SPECIFIC"
+	| "UNASSIGNED";
+
+export type ResolvedCredentialStatus = {
+	credentialId: string;
+	statusReference: CredentialStatus["status_list"];
+	status: {
+		value: number;
+		label: TokenStatusLabel;
+		isValid: boolean;
+	};
+	statusList: {
+		uri: string;
+		bits: 1 | 2 | 4 | 8;
+		iat: number;
+		exp?: number;
+		ttl?: number;
+		aggregationUri?: string;
+		jwt: string;
+	};
+};
+
 export class Wallet {
 	constructor(private readonly storage: WalletStorage) {}
 
@@ -119,6 +147,63 @@ export class Wallet {
 
 	async listCredentials(): Promise<StoredCredentialRecord[]> {
 		return this.storage.listCredentials();
+	}
+
+	async getCredentialStatus(
+		credentialId: string,
+		options?: { fetch?: typeof fetch },
+	): Promise<ResolvedCredentialStatus | null> {
+		const credential = await this.storage.getCredential(credentialId);
+		if (!credential) {
+			throw new WalletError(`Credential ${credentialId} not found`);
+		}
+		if (!credential.status?.status_list) {
+			return null;
+		}
+
+		const doFetch = options?.fetch ?? fetch;
+		const statusJwt = await fetchStatusListJwt(
+			credential.status.status_list.uri,
+			doFetch,
+		);
+		const protectedHeader = decodeProtectedHeader(statusJwt);
+		const issuerKeyMaterial =
+			credential.issuerKeyMaterial ??
+			(await fetchIssuerKeyMaterial(credential.issuer, doFetch));
+		const verificationKey = await resolveIssuerVerificationKey(
+			issuerKeyMaterial,
+			protectedHeader.kid,
+			typeof protectedHeader.alg === "string" ? protectedHeader.alg : undefined,
+		);
+		const verified = await jwtVerify(statusJwt, verificationKey, {
+			typ: "statuslist+jwt",
+			subject: credential.status.status_list.uri,
+		});
+		const payload = parseStatusListTokenPayload(verified.payload);
+		const value = readStatusValue(
+			payload.status_list.lst,
+			payload.status_list.bits,
+			credential.status.status_list.idx,
+		);
+
+		return {
+			credentialId: credential.id,
+			statusReference: credential.status.status_list,
+			status: {
+				value,
+				label: labelForTokenStatus(value),
+				isValid: value === 0,
+			},
+			statusList: {
+				uri: credential.status.status_list.uri,
+				bits: payload.status_list.bits,
+				iat: payload.iat,
+				exp: payload.exp,
+				ttl: payload.ttl,
+				aggregationUri: payload.status_list.aggregation_uri,
+				jwt: statusJwt,
+			},
+		};
 	}
 
 	getVpFormatsSupported(): {
@@ -218,6 +303,8 @@ export class Wallet {
 			vct,
 			holderKeyId: holderKey.id,
 			claims: stripReservedClaims(allClaims),
+			status: parseCredentialStatus(payload.status),
+			issuerKeyMaterial: parsedInput.issuer,
 			importedAt: new Date().toISOString(),
 		});
 
@@ -395,6 +482,199 @@ function normalizeSdJwt(compact: string): string {
 
 function stripTrailingEmptyPart(compact: string): string {
 	return compact.endsWith("~") ? compact.slice(0, -1) : compact;
+}
+
+async function fetchStatusListJwt(uri: string, doFetch: typeof fetch) {
+	const response = await doFetch(uri, {
+		headers: {
+			accept: "application/statuslist+jwt, application/jwt, text/plain",
+		},
+	});
+	if (!response.ok) {
+		throw new WalletError(
+			`Status list fetch failed with status ${response.status}`,
+		);
+	}
+	const payload = (await response.text()).trim();
+	if (!payload) {
+		throw new WalletError("Status list response is empty");
+	}
+	return payload;
+}
+
+async function fetchIssuerKeyMaterial(
+	issuer: string,
+	doFetch: typeof fetch,
+): Promise<IssuerKeyMaterial> {
+	const response = await doFetch(getCredentialIssuerMetadataUrl(issuer), {
+		headers: { accept: "application/json" },
+	});
+	if (!response.ok) {
+		throw new WalletError(
+			`Issuer metadata fetch failed with status ${response.status}`,
+		);
+	}
+	let payload: unknown;
+	try {
+		payload = (await response.json()) as unknown;
+	} catch {
+		throw new WalletError("Failed to parse issuer metadata response");
+	}
+	const parsed = readRecordClaim(
+		payload,
+		"Issuer metadata must be a JSON object",
+	);
+	return {
+		issuer,
+		jwks: readRecordClaim(parsed.jwks, "Issuer metadata is missing jwks") as {
+			keys: Array<Record<string, unknown>>;
+		},
+	};
+}
+
+function getCredentialIssuerMetadataUrl(credentialIssuer: string): string {
+	const issuerUrl = new URL(credentialIssuer);
+	const issuerPath = issuerUrl.pathname === "/" ? "" : issuerUrl.pathname;
+	return new URL(
+		`/.well-known/openid-credential-issuer${issuerPath}`,
+		issuerUrl.origin,
+	).toString();
+}
+
+function parseCredentialStatus(value: unknown): CredentialStatus | undefined {
+	if (!value || typeof value !== "object" || Array.isArray(value)) {
+		return undefined;
+	}
+	const status = value as Record<string, unknown>;
+	const statusList = status.status_list;
+	if (
+		!statusList ||
+		typeof statusList !== "object" ||
+		Array.isArray(statusList)
+	) {
+		return undefined;
+	}
+	const parsedStatusList = statusList as Record<string, unknown>;
+	if (
+		typeof parsedStatusList.idx !== "number" ||
+		!Number.isInteger(parsedStatusList.idx) ||
+		parsedStatusList.idx < 0 ||
+		typeof parsedStatusList.uri !== "string" ||
+		parsedStatusList.uri.length === 0
+	) {
+		return undefined;
+	}
+	return {
+		status_list: {
+			idx: parsedStatusList.idx,
+			uri: parsedStatusList.uri,
+		},
+	};
+}
+
+function parseStatusListTokenPayload(payload: Record<string, unknown>) {
+	const sub = readStringClaim(payload.sub, "Status list token is missing sub");
+	const iat = readIntegerClaim(payload.iat, "Status list token is missing iat");
+	const exp =
+		payload.exp === undefined
+			? undefined
+			: readIntegerClaim(
+					payload.exp,
+					"Status list token exp must be an integer",
+				);
+	const ttl =
+		payload.ttl === undefined
+			? undefined
+			: readPositiveIntegerClaim(
+					payload.ttl,
+					"Status list token ttl must be a positive integer",
+				);
+	const statusList = readRecordClaim(
+		payload.status_list,
+		"Status list token is missing status_list",
+	);
+	const bits = readStatusListBits(statusList.bits);
+	const lst = readStringClaim(
+		statusList.lst,
+		"Status list token is missing lst",
+	);
+	const aggregation_uri =
+		statusList.aggregation_uri === undefined
+			? undefined
+			: readStringClaim(
+					statusList.aggregation_uri,
+					"Status list aggregation_uri must be a string",
+				);
+	return {
+		sub,
+		iat,
+		exp,
+		ttl,
+		status_list: {
+			bits,
+			lst,
+			aggregation_uri,
+		},
+	};
+}
+
+function readStatusValue(
+	lst: string,
+	bits: 1 | 2 | 4 | 8,
+	idx: number,
+): number {
+	let bytes: Uint8Array;
+	try {
+		bytes = inflateSync(Buffer.from(lst, "base64url"));
+	} catch {
+		throw new WalletError("Failed to decode status list payload");
+	}
+	const bitOffset = idx * bits;
+	const byteIndex = Math.floor(bitOffset / 8);
+	const intraByteOffset = bitOffset % 8;
+	const selectedByte = bytes[byteIndex];
+	if (selectedByte === undefined) {
+		throw new WalletError(`Status list index ${idx} is out of bounds`);
+	}
+	return (selectedByte >> intraByteOffset) & ((1 << bits) - 1);
+}
+
+function readStatusListBits(value: unknown): 1 | 2 | 4 | 8 {
+	if (value === 1 || value === 2 || value === 4 || value === 8) {
+		return value;
+	}
+	throw new WalletError("Status list bits must be one of 1, 2, 4, or 8");
+}
+
+function readIntegerClaim(value: unknown, message: string): number {
+	if (typeof value !== "number" || !Number.isInteger(value)) {
+		throw new WalletError(message);
+	}
+	return value;
+}
+
+function readPositiveIntegerClaim(value: unknown, message: string): number {
+	const parsed = readIntegerClaim(value, message);
+	if (parsed <= 0) {
+		throw new WalletError(message);
+	}
+	return parsed;
+}
+
+function labelForTokenStatus(value: number): TokenStatusLabel {
+	if (value === 0) {
+		return "VALID";
+	}
+	if (value === 1) {
+		return "INVALID";
+	}
+	if (value === 2) {
+		return "SUSPENDED";
+	}
+	if (value === 3 || (value >= 12 && value <= 15)) {
+		return "APPLICATION_SPECIFIC";
+	}
+	return "UNASSIGNED";
 }
 
 async function resolveIssuerVerificationKey(

@@ -140,11 +140,13 @@ Show a single stored credential by id.
 
 ```bash
 wallet-cli show --wallet-dir ./my-wallet --credential-id <id>
+wallet-cli show --wallet-dir ./my-wallet --credential-id <id> --resolve-status
 ```
 
 Options:
 - `--wallet-dir <dir>` (required) - path to the wallet directory
 - `--credential-id <id>` (required) - credential id (from `list` output)
+- `--resolve-status` - fetch and verify the credential status list on demand
 
 ### `present`
 

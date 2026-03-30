@@ -21,6 +21,7 @@ import {
 	initWalletAction,
 	presentCredentialAction,
 	receiveCredentialAction,
+	showCredentialAction,
 } from "./index.ts";
 import { FileSystemWalletStorage } from "./storage.ts";
 
@@ -154,6 +155,12 @@ describe("wallet-cli", () => {
 		const walletDir = await mkdtemp(join(tmpdir(), "wallet-cli-receive-"));
 		try {
 			const issuer = await createOid4VciIssuerFixture();
+			const statusList = issuer.createStatusList({
+				uri: "https://issuer.example/status-lists/1",
+				bits: 2,
+			});
+			const allocatedStatus = issuer.allocateCredentialStatus({ statusList });
+			let currentStatusList = allocatedStatus.updatedStatusList;
 			const offer = issuer.createCredentialOffer({
 				credential_configuration_id: "person",
 				claims: { given_name: "Ada", family_name: "Lovelace" },
@@ -210,9 +217,18 @@ describe("wallet-cli", () => {
 							accessToken: currentAccessToken,
 							credential_configuration_id: request.credential_configuration_id,
 							proof,
+							status: allocatedStatus.credentialStatus,
 						});
 						currentAccessToken = issued.updatedAccessToken;
 						return Response.json(issued);
+					}
+					if (url === "https://issuer.example/status-lists/1") {
+						return new Response(
+							await issuer.createStatusListToken(currentStatusList),
+							{
+								headers: { "content-type": "application/statuslist+jwt" },
+							},
+						);
 					}
 					throw new Error(`Unexpected fetch ${url}`);
 				},
@@ -225,6 +241,31 @@ describe("wallet-cli", () => {
 					expect(result.credential.claims).toEqual({
 						given_name: "Ada",
 						family_name: "Lovelace",
+					});
+					const shown = await showCredentialAction({
+						walletDir,
+						credentialId: result.credential.id,
+						resolveStatus: true,
+					});
+					expect(shown.status?.status).toEqual({
+						value: 0,
+						label: "VALID",
+						isValid: true,
+					});
+					currentStatusList = issuer.updateCredentialStatus({
+						statusList: currentStatusList,
+						idx: 0,
+						status: 2,
+					});
+					const suspended = await showCredentialAction({
+						walletDir,
+						credentialId: result.credential.id,
+						resolveStatus: true,
+					});
+					expect(suspended.status?.status).toEqual({
+						value: 2,
+						label: "SUSPENDED",
+						isValid: false,
 					});
 				},
 			);

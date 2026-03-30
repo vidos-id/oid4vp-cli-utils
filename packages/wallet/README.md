@@ -38,6 +38,7 @@ This package is currently published as raw TypeScript and is intended for Bun-ba
 - pluggable storage interface
 - issuer JWK/JWKS credential verification (optional)
 - direct OID4VCI receipt from credential offers
+- on-demand credential status resolution via Token Status List JWTs
 - DCQL matching with `dcql`
 - `openid4vp://` authorization URL parsing for by-value DCQL requests
 - selective disclosure presentation building
@@ -74,6 +75,9 @@ await receiveCredentialFromOffer(
   wallet,
   'openid-credential-offer://?credential_offer=...'
 );
+
+// Resolve credential status only when needed
+const status = await wallet.getCredentialStatus("credential-id");
 
 // Create a presentation from a DCQL request
 const presentation = await wallet.createPresentation({

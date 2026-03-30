@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { SDJwt } from "@sd-jwt/core";
 import { hasher } from "@sd-jwt/hash";
-import { exportJWK, generateKeyPair, SignJWT } from "jose";
+import {
+	exportJWK,
+	generateKeyPair,
+	importJWK,
+	jwtVerify,
+	SignJWT,
+} from "jose";
 import { generateIssuerTrustMaterial } from "./crypto.ts";
 import { IssuerError } from "./errors.ts";
 import { createIssuer } from "./issuer.ts";
@@ -103,8 +109,48 @@ describe("issuer metadata and offers", () => {
 });
 
 describe("token exchange and issuance", () => {
+	test("allocates and updates credential status lists", async () => {
+		const { issuer, trust } = await createTestIssuer();
+		const statusList = issuer.createStatusList({
+			uri: "https://issuer.example/status-lists/1",
+			bits: 2,
+			ttl: 300,
+		});
+		const allocated = issuer.allocateCredentialStatus({ statusList });
+		expect(allocated.credentialStatus).toEqual({
+			status_list: {
+				idx: 0,
+				uri: "https://issuer.example/status-lists/1",
+			},
+		});
+		const updated = issuer.updateCredentialStatus({
+			statusList: allocated.updatedStatusList,
+			idx: 0,
+			status: 2,
+		});
+		expect(updated.statuses).toEqual([2]);
+
+		const jwt = await issuer.createStatusListToken(updated);
+		const publicKey = await importJWK(trust.publicJwk, trust.alg, {
+			extractable: true,
+		});
+		const verified = await jwtVerify(jwt, publicKey, {
+			typ: "statuslist+jwt",
+			subject: "https://issuer.example/status-lists/1",
+		});
+		expect(verified.payload.status_list).toEqual({
+			bits: 2,
+			lst: expect.any(String),
+		});
+		expect(verified.payload.ttl).toBe(300);
+	});
+
 	test("exchanges code, validates proof, and issues a holder-bound dc+sd-jwt", async () => {
 		const { issuer } = await createTestIssuer();
+		const statusList = issuer.createStatusList({
+			uri: "https://issuer.example/status-lists/1",
+		});
+		const allocatedStatus = issuer.allocateCredentialStatus({ statusList });
 		const offer = issuer.createCredentialOffer({
 			credential_configuration_id: "employee_card",
 			claims: { given_name: "Ada", family_name: "Lovelace" },
@@ -132,6 +178,7 @@ describe("token exchange and issuance", () => {
 			accessToken: tokenResponse.accessTokenRecord,
 			credential_configuration_id: "employee_card",
 			proof: validatedProof,
+			status: allocatedStatus.credentialStatus,
 		});
 
 		expect(issued.format).toBe("dc+sd-jwt");
@@ -144,6 +191,12 @@ describe("token exchange and issuance", () => {
 		expect(parsed.payload?.vct).toBe(
 			"https://issuer.example/credentials/employee-card",
 		);
+		expect(parsed.payload?.status).toEqual({
+			status_list: {
+				idx: 0,
+				uri: "https://issuer.example/status-lists/1",
+			},
+		});
 		expect(parsed.payload?.cnf).toEqual({ jwk: proof.publicJwk });
 
 		const reconstructed = await (

@@ -39,6 +39,7 @@ This package is currently published as raw TypeScript and is intended for Bun-ba
 - token exchange + nonce issuance
 - proof JWT validation with `typ=openid4vci-proof+jwt`
 - claim-set driven issuance
+- token status list creation, signing, and status updates
 - issuer key and certificate generation for demo trust bootstrapping
 - multi-algorithm support: ES256, ES384, EdDSA
 
@@ -96,6 +97,14 @@ const offerUri = issuer.createCredentialOfferUri({
   claims: { given_name: "Ada", family_name: "Lovelace" },
 });
 
+const statusList = issuer.createStatusList({
+  uri: "https://issuer.example/status-lists/1",
+  bits: 2,
+  ttl: 300,
+});
+
+const allocatedStatus = issuer.allocateCredentialStatus({ statusList });
+
 await db.saveGrant(offer.preAuthorizedGrant.preAuthorizedCode, offer.preAuthorizedGrant);
 
 const token = issuer.exchangePreAuthorizedCode({
@@ -111,7 +120,10 @@ await db.saveAccessToken(token.accessTokenRecord.accessToken, token.accessTokenR
 const issued = await issuer.issueCredential({
   accessToken: await db.readAccessToken(token.accessTokenRecord.accessToken),
   credential_configuration_id: "person",
+  status: allocatedStatus.credentialStatus,
 });
+
+const statusListJwt = await issuer.createStatusListToken(allocatedStatus.updatedStatusList);
 ```
 
 For holder binding, the wallet provides its public JWK via a proof JWT -- see the [`@vidos-id/wallet`](../wallet/) library and [`scripts/demo-e2e.ts`](../../scripts/demo-e2e.ts) for the full flow.

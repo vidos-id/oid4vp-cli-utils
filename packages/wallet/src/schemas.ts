@@ -13,6 +13,15 @@ export const HolderKeyRecordSchema = z.object({
 	createdAt: z.string().datetime(),
 });
 
+export const CredentialStatusListReferenceSchema = z.object({
+	idx: z.number().int().nonnegative(),
+	uri: z.string().min(1),
+});
+
+export const CredentialStatusSchema = z.object({
+	status_list: CredentialStatusListReferenceSchema,
+});
+
 export const StoredCredentialRecordSchema = z.object({
 	id: z.string().min(1),
 	format: z.literal("dc+sd-jwt"),
@@ -21,6 +30,8 @@ export const StoredCredentialRecordSchema = z.object({
 	vct: z.string().min(1),
 	holderKeyId: z.string().min(1),
 	claims: z.record(z.string(), z.unknown()),
+	status: CredentialStatusSchema.optional(),
+	issuerKeyMaterial: z.lazy(() => IssuerKeyMaterialSchema).optional(),
 	importedAt: z.string().datetime(),
 });
 
@@ -123,6 +134,10 @@ export const WalletConfigSchema = z.object({
 });
 
 export type HolderKeyRecord = z.infer<typeof HolderKeyRecordSchema>;
+export type CredentialStatus = z.infer<typeof CredentialStatusSchema>;
+export type CredentialStatusListReference = z.infer<
+	typeof CredentialStatusListReferenceSchema
+>;
 export type StoredCredentialRecord = z.infer<
 	typeof StoredCredentialRecordSchema
 >;

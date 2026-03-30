@@ -32,6 +32,48 @@ export const credentialConfigurationSchema = z.object({
 export const signingAlgSchema = z.enum(["ES256", "ES384", "EdDSA"]);
 export type SigningAlg = z.infer<typeof signingAlgSchema>;
 
+export const statusListBitsSchema = z.union([
+	z.literal(1),
+	z.literal(2),
+	z.literal(4),
+	z.literal(8),
+]);
+
+export const tokenStatusValueSchema = z.number().int().min(0).max(255);
+
+export const credentialStatusListReferenceSchema = z.object({
+	idx: z.number().int().nonnegative(),
+	uri: z.string().min(1),
+});
+
+export const credentialStatusSchema = z.object({
+	status_list: credentialStatusListReferenceSchema,
+});
+
+export const statusListRecordSchema = z.object({
+	uri: z.string().min(1),
+	bits: statusListBitsSchema.default(1),
+	statuses: z.array(tokenStatusValueSchema).default([]),
+	ttl: z.number().int().positive().optional(),
+	expiresAt: z.number().int().positive().optional(),
+	aggregation_uri: z.string().min(1).optional(),
+});
+
+export const createStatusListInputSchema = statusListRecordSchema.omit({
+	statuses: true,
+});
+
+export const allocateCredentialStatusInputSchema = z.object({
+	statusList: statusListRecordSchema,
+	status: tokenStatusValueSchema.default(0),
+});
+
+export const updateCredentialStatusInputSchema = z.object({
+	statusList: statusListRecordSchema,
+	idx: z.number().int().nonnegative(),
+	status: tokenStatusValueSchema,
+});
+
 export const issuerConfigSchema = z.object({
 	issuer: z.string().url(),
 	credentialConfigurationsSupported: z
@@ -162,6 +204,7 @@ export const issueCredentialInputSchema = z.object({
 	accessToken: accessTokenRecordSchema,
 	credential_configuration_id: z.string().min(1),
 	holderPublicJwk: jwkSchema.optional(),
+	status: credentialStatusSchema.optional(),
 });
 
 export const nonceRecordSchema = z.object({
@@ -202,9 +245,14 @@ export const validateProofJwtInputSchema = z.object({
 
 export type Jwk = z.infer<typeof jwkSchema>;
 export type ClaimSet = z.infer<typeof claimSetSchema>;
+export type CreateStatusListInput = z.input<typeof createStatusListInputSchema>;
 export type IssuerConfig = z.infer<typeof issuerConfigSchema>;
 export type CredentialConfiguration = z.input<
 	typeof credentialConfigurationSchema
+>;
+export type CredentialStatus = z.infer<typeof credentialStatusSchema>;
+export type CredentialStatusListReference = z.infer<
+	typeof credentialStatusListReferenceSchema
 >;
 export type IssuerConfigInput = z.input<typeof issuerConfigSchema>;
 export type CreatePreAuthorizedGrantInput = z.input<
@@ -231,6 +279,9 @@ export type AccessTokenRecord = z.infer<typeof accessTokenRecordSchema>;
 export type IssueCredentialInput = z.input<typeof issueCredentialInputSchema>;
 export type NonceRecord = z.infer<typeof nonceRecordSchema>;
 export type NonceResponse = z.infer<typeof nonceResponseSchema>;
+export type StatusListBits = z.infer<typeof statusListBitsSchema>;
+export type StatusListRecord = z.infer<typeof statusListRecordSchema>;
 export type CredentialRequest = z.infer<typeof credentialRequestSchema>;
 export type CredentialResponse = z.infer<typeof credentialResponseSchema>;
+export type TokenStatusValue = z.infer<typeof tokenStatusValueSchema>;
 export type ValidateProofJwtInput = z.input<typeof validateProofJwtInputSchema>;

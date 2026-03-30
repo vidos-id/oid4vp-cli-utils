@@ -153,6 +153,10 @@ Examples:
 			"Credential id (from list output) to display",
 		)
 		.option(
+			"--resolve-status",
+			"Fetch and verify the credential status list on demand",
+		)
+		.option(
 			"--output <format>",
 			"Output format: json or raw (compact sd-jwt text)",
 			"json",
@@ -162,6 +166,7 @@ Examples:
 			`
 Examples:
   $ wallet-cli show --wallet-dir ./my-wallet --credential-id <id>
+  $ wallet-cli show --wallet-dir ./my-wallet --credential-id <id> --resolve-status
   $ wallet-cli show --wallet-dir ./my-wallet --credential-id <id> --output raw`,
 		)
 		.action(async (options) => {
