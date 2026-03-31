@@ -64,6 +64,15 @@ export function serializeCredentialOfferUri(
 	return credentialOfferUriSchema.parse(url.toString());
 }
 
+export function serializeCredentialOfferReferenceUri(
+	credentialOfferUrl: string,
+): CredentialOfferUri {
+	const parsed = new URL(credentialOfferUrl).toString();
+	const url = new URL("openid-credential-offer://");
+	url.searchParams.set("credential_offer_uri", parsed);
+	return credentialOfferUriSchema.parse(url.toString());
+}
+
 export function getCredentialIssuerMetadataUrl(
 	credentialIssuer: string,
 ): string {

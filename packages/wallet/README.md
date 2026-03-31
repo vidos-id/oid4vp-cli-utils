@@ -76,6 +76,18 @@ await receiveCredentialFromOffer(
   'openid-credential-offer://?credential_offer=...'
 );
 
+// Or start from a by-reference offer URI
+await receiveCredentialFromOffer(
+  wallet,
+  'openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffers%2Fperson-1'
+);
+
+// Endpoint resolution is metadata-driven:
+// 1. parse the offer or fetch credential_offer_uri first
+// 2. read credential_issuer from the resolved offer
+// 3. fetch /.well-known/openid-credential-issuer[issuer-path]
+// 4. use token_endpoint / credential_endpoint / optional nonce_endpoint from metadata
+
 // Resolve credential status only when needed
 const status = await wallet.getCredentialStatus("credential-id");
 
@@ -104,10 +116,30 @@ Supported `openid4vp://` subset:
 - rejects `request`, `request_uri`, `scope`, and Presentation Exchange input
 
 Supported OID4VCI subset:
-- by-value credential offers only
+- by-value credential offers and by-reference `credential_offer_uri`
 - pre-authorized-code flow only
 - JWT proof only
 - single `dc+sd-jwt` credential request + import
+
+OID4VCI endpoint resolution:
+- `receiveCredentialFromOffer` parses the offer input or fetches `credential_offer_uri`, then reads `credential_issuer`
+- issuer metadata is fetched from `/.well-known/openid-credential-issuer` relative to that issuer
+- if `credential_issuer` contains a path, that path is appended to the well-known URL
+- the fetched metadata must repeat the same `credential_issuer`
+- `token_endpoint` and `credential_endpoint` are taken from metadata, not hardcoded in the wallet
+- `nonce_endpoint` is used only if the token response does not already include `c_nonce`
+- there is no API to manually override discovered endpoints
+
+Examples:
+- `https://issuer.example` -> `https://issuer.example/.well-known/openid-credential-issuer`
+- `https://issuer.example/tenant-a` -> `https://issuer.example/.well-known/openid-credential-issuer/tenant-a`
+
+This allows issuers to use non-standard endpoint paths such as `/token` or `/credential`, as long as those exact URLs are returned in issuer metadata.
+
+Current limitations:
+- `credential_offer_uri` must return a supported by-value offer document
+- issuer metadata must contain `token_endpoint`, `credential_endpoint`, `jwks`, and the requested credential configuration
+- if the token response omits `c_nonce`, issuer metadata must provide `nonce_endpoint`
 
 ## See also
 

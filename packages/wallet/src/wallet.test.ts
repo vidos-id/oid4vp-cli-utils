@@ -240,6 +240,97 @@ describe("wallet", () => {
 		);
 	});
 
+	test("receives a credential from a credential_offer_uri and stores it", async () => {
+		const storage = new InMemoryWalletStorage();
+		const wallet = new Wallet(storage);
+		const issuer = await createOid4VciIssuerFixture();
+		const statusList = issuer.createStatusList({
+			uri: "https://issuer.example/status-lists/1",
+			bits: 2,
+		});
+		const allocatedStatus = issuer.allocateCredentialStatus({ statusList });
+		const offerReference =
+			"openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffers%2Fperson-1";
+		let currentGrant: PreAuthorizedGrantRecord | null = null;
+		let currentAccessToken: AccessTokenRecord | null = null;
+		let currentNonce: NonceRecord | null = null;
+
+		await withMockedFetch(
+			async (input, init) => {
+				const url = String(input);
+				if (url === "https://issuer.example/offers/person-1") {
+					const offer = issuer.createCredentialOffer({
+						credential_configuration_id: "person",
+						claims: { given_name: "Ada", family_name: "Lovelace" },
+					});
+					currentGrant = offer.preAuthorizedGrant;
+					return Response.json(offer);
+				}
+				if (
+					url === "https://issuer.example/.well-known/openid-credential-issuer"
+				) {
+					return Response.json(issuer.getMetadata());
+				}
+				if (url === "https://issuer.example/token") {
+					if (!currentGrant) {
+						throw new Error("Missing offer state");
+					}
+					const body = new URLSearchParams(String(init?.body));
+					const tokenResponse = issuer.exchangePreAuthorizedCode({
+						tokenRequest: {
+							grant_type:
+								"urn:ietf:params:oauth:grant-type:pre-authorized_code",
+							"pre-authorized_code": body.get("pre-authorized_code") ?? "",
+						},
+						preAuthorizedGrant: currentGrant,
+					});
+					currentGrant = tokenResponse.updatedPreAuthorizedGrant;
+					currentAccessToken = tokenResponse.accessTokenRecord;
+					return Response.json(tokenResponse);
+				}
+				if (url === "https://issuer.example/nonce") {
+					expect(init?.method).toBe("POST");
+					const nonce = issuer.createNonce();
+					currentNonce = nonce.nonce;
+					return Response.json({
+						c_nonce: nonce.c_nonce,
+						c_nonce_expires_in: nonce.c_nonce_expires_in,
+					});
+				}
+				if (url === "https://issuer.example/credential") {
+					if (!currentAccessToken || !currentNonce) {
+						throw new Error("Missing token or nonce state");
+					}
+					const request = JSON.parse(String(init?.body)) as {
+						credential_configuration_id: string;
+						proofs: { jwt: Array<{ jwt: string }> };
+					};
+					const proof = await issuer.validateProofJwt({
+						jwt: request.proofs.jwt[0]?.jwt ?? "",
+						nonce: currentNonce,
+					});
+					const issued = await issuer.issueCredential({
+						accessToken: currentAccessToken,
+						credential_configuration_id: request.credential_configuration_id,
+						proof,
+						status: allocatedStatus.credentialStatus,
+					});
+					currentAccessToken = issued.updatedAccessToken;
+					return Response.json(issued);
+				}
+				throw new Error(`Unexpected fetch ${url}`);
+			},
+			async () => {
+				const stored = await receiveCredentialFromOffer(wallet, offerReference);
+				expect(stored.issuer).toBe("https://issuer.example");
+				expect(stored.claims).toEqual({
+					given_name: "Ada",
+					family_name: "Lovelace",
+				});
+			},
+		);
+	});
+
 	test("verifies the provided sd-jwt presentation kb-jwt signature", async () => {
 		const presentation =
 			"eyJ0eXAiOiJkYytzZC1qd3QiLCJraWQiOiJpc3N1ZXIta2V5LTEiLCJ4NWMiOlsiTUlJQmR6Q0NBU21nQXdJQkFnSVVMQTVLYjhZTVlLZlRlcmpobzJQRER4eERteXN3QlFZREsyVndNREV4RkRBU0JnTlZCQU1NQzBSbGJXOGdTWE56ZFdWeU1Sa3dGd1lEVlFRS0RCQnZhV1EwZG5BdFkyeHBMWFYwYVd4ek1CNFhEVEkyTURNeU16RTJNRFExT1ZvWERUSTNNRE15TXpFMk1EUTFPVm93TVRFVU1CSUdBMVVFQXd3TFJHVnRieUJKYzNOMVpYSXhHVEFYQmdOVkJBb01FRzlwWkRSMmNDMWpiR2t0ZFhScGJITXdLakFGQmdNclpYQURJUUNsSWJ4NFR3bHRMVnc2Q0tRUmpKZTFMbVlSQ1gwdzZtWW1haHpYaEI0UGFxTlRNRkV3SFFZRFZSME9CQllFRkUzTDRCK0ZZOGVIWVFySHVEOXkxYUhaNGttek1COEdBMVVkSXdRWU1CYUFGRTNMNEIrRlk4ZUhZUXJIdUQ5eTFhSFo0a216TUE4R0ExVWRFd0VCL3dRRk1BTUJBZjh3QlFZREsyVndBMEVBVTJmTjMrdXNUTFV2OXc1bWZvczNPb3BKSFVac3ErdlltVkQ2c1NnQmljK1c1MWhwbE4wMHNLS2RLS1R5N3RSWEI5K1hUSWdPMkNxTnlQaGc2WElGQUE9PSJdLCJhbGciOiJFZERTQSJ9.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwiaWF0IjoxNzc0MjgxOTA2LCJ2Y3QiOiJ1cm46ZXVkaTpwaWQ6MSIsImNuZiI6eyJqd2siOnsia3R5IjoiRUMiLCJhbGciOiJFUzI1NiIsImNydiI6IlAtMjU2IiwieCI6IkdjU0FvWElXUEtDcEd1U3JhbVIzRUpQd1lYdjZpLTdrOEJmUmRHdHdIeEkiLCJ5IjoiTHRSb0YxWC1WdTludEhpQXI0VTY1alU0SGJJS2VySDJDelVkQmxvNFZ6RSIsInVzZSI6InNpZyJ9fSwiX3NkIjpbIjBCVzY4Z05rLTVqX3l2dDRWSjZUMUlnSjY1UEdOWnh1SWpIdC1ZSUM0ZmMiLCI3MmZpMVc5TnQ2UFRhMk10dUxqMVcwWndQNWZHd2pWWFo3QkJUMHBEcTJ3IiwiVy10cGFvbUZHVU5ic3NWLXB0MVFqTDloYWl0QlN5WXRIZEd5MWVoU0ZLWSIsIldPTEU0QURPMElqSGU5Ry1uUWpRcS1EQjU2N0JuNXBOeVA0UnFhaE1FT1EiLCJZOFpqRi1aV3pfZ2tKUTRoXzl0MWlHN1NqQkZXdWdPMWtpVVhRWldDYkt3IiwiZl9pZF93cERveWc2NnYySEdaY21ROUpGRURKQWZmUUQ3bFNsUDN3SmVlNCIsImswZ3BscHFRV2dmaW9IbmxqMjUyTllXQWtNSS02YXhLV1VjUUt4bzNZMmsiLCJwd1FLcFgyajVQRXhpajFsWjlHVEZ5RVBRWDltaDZ6RlpVUXlfU3BLeHJjIiwic0w3MXgxcnR4bGdJSldtWmFrNDFiRGZETkc4czduM1dVVE1KSWw1b0l2TSIsIngtMzh3NkwyNDMwVFp6emtoSlNqRHdjT3BiMTdHSWJhSGsxekJhaE9IZzQiXSwiX3NkX2FsZyI6InNoYS0yNTYifQ.a_mT5TdLCZbl2KqQ09WVucLSI-ttHHL1VwknJJQmYduf-ASArGh98uW7zvm8JQhwsA0UEaRMPtFNDAugzJ7WAg~WyJOQnFKWE9CdmhoenJXSXlqNDdrbWlnIiwiZmFtaWx5X25hbWUiLCJMb3ZlbGFjZSJd~WyJoRmp6RHdLaWlDTU4wY0NfNzlQYW1RIiwiZ2l2ZW5fbmFtZSIsIkFkYSJd~WyJnZVFhdWxhaGtPcjBRU244a0gwdkhBIiwiYmlydGhkYXRlIiwiMTgxNS0xMi0xMCJd~eyJhbGciOiJFUzI1NiIsInR5cCI6ImtiK2p3dCJ9.eyJhdWQiOiJ4NTA5X3Nhbl9kbnM6ZXhwbGljaXQtYXF1YW1hcmluZS1tYWNrZXJlbC01MTQuZ2F0ZXdheS5zZXJ2aWNlLmV1LnZpZG9zLmRldiIsIm5vbmNlIjoibi02MjU4MGFkMC1lM2NlLTRjYWEtOWRhNS02Y2ZlNWYyYmI1NjQiLCJzZF9oYXNoIjoiMkMybVhDaUxQNUluVU9ZQXBDOFl3MFNkMmN2VDE2UjlTSnloSkpuYlNKMCIsImlhdCI6MTc3NDI4MTk5Mn0.MOl_CrBYz7r_1pJQ9IrGEZkK94JsUb7_WGC0QIwJOAOpwfIPrX_1UXj7qM7dlqW0h7BdYf6a71HJuAjNfXneHw";

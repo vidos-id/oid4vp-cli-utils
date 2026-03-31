@@ -115,6 +115,8 @@ Receive and store a credential from a minimal OpenID4VCI credential offer.
 
 This command encapsulates the supported wallet-side redemption flow. Agents should call `wallet-cli receive` instead of manually extracting the offer, exchanging the pre-authorized code, fetching nonces, constructing proof JWTs, calling the credential endpoint, and then separately importing the result.
 
+Endpoint discovery is metadata-driven. `wallet-cli receive` does not hardcode token or credential API paths such as `/api/issuer/token`.
+
 ```bash
 # From an openid-credential-offer URI
 wallet-cli receive \
@@ -125,15 +127,41 @@ wallet-cli receive \
 wallet-cli receive \
   --wallet-dir ./my-wallet \
   --offer '{"credential_issuer":"https://issuer.example",...}'
+
+# From a by-reference offer URI
+wallet-cli receive \
+  --wallet-dir ./my-wallet \
+  --offer 'openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffers%2Fperson-1'
 ```
 
 Options:
 - `--wallet-dir <dir>` (required) - path to the wallet directory
 - `--offer <value>` (required) - credential offer JSON or `openid-credential-offer://` URI
 
+Endpoint resolution and API usage:
+- parse the credential offer input
+- if the input contains `credential_offer_uri`, fetch that URL first and parse the returned offer JSON
+- fetch issuer metadata from `/.well-known/openid-credential-issuer` relative to that issuer
+- if `credential_issuer` includes a path, append that path to the well-known endpoint
+- require the fetched `credential_issuer` in metadata to exactly match the one from the offer
+- use `token_endpoint` from metadata for the pre-authorized-code token exchange
+- use `credential_endpoint` from metadata for the credential request
+- use `nonce_endpoint` from metadata only when the token response does not already include `c_nonce`
+- send the proof JWT with `aud` set to `metadata.credential_issuer`
+
+Examples of metadata resolution:
+- `credential_issuer = https://issuer.example` -> fetch `https://issuer.example/.well-known/openid-credential-issuer`
+- `credential_issuer = https://issuer.example/tenant-a` -> fetch `https://issuer.example/.well-known/openid-credential-issuer/tenant-a`
+
+This means non-standard endpoint paths are fine as long as the issuer metadata advertises them. For example, a token endpoint at `/token` works if the fetched metadata contains `"token_endpoint": "https://issuer.example/token"`.
+
 Notes:
-- supports by-value credential offers only
+- supports by-value `credential_offer` and by-reference `credential_offer_uri`
+- resolves API endpoints from issuer metadata; it does not guess endpoint paths and does not expose manual endpoint overrides
 - current flow covers the minimal OpenID4VCI subset: pre-authorized code, JWT proof, and single `dc+sd-jwt` issuance
+- `credential_offer_uri` is fetched with `Accept: application/json` and must return a supported by-value offer document
+- if the token response omits `c_nonce`, the issuer metadata must provide `nonce_endpoint`
+- issuer metadata must include `token_endpoint`, `credential_endpoint`, `jwks`, and the referenced credential configuration
 
 ### `list`
 
@@ -269,7 +297,8 @@ Options:
 - `present` auto-submits `direct_post` and `direct_post.jwt` responses unless `--dry-run` is set
 - when multiple credentials match a query, `present` prompts interactively in a TTY or returns an error with a `--credential-id` suggestion in non-TTY environments
 - only by-value DCQL requests are supported
-- `receive` supports only the minimal OID4VCI subset: by-value offers, pre-authorized-code, JWT proof, and single `dc+sd-jwt` issuance
+- `receive` resolves issuer metadata from `/.well-known/openid-credential-issuer[issuer-path]` and then uses the advertised endpoints from that metadata
+- `receive` supports the minimal OID4VCI subset: by-value offers, by-reference `credential_offer_uri`, pre-authorized-code, JWT proof, and single `dc+sd-jwt` issuance
 - `show --resolve-status` fetches, verifies, and decodes IETF status list JWTs for stored credentials that include a `status.status_list` reference
 - credentials are issued with [`@vidos-id/issuer-cli`](../issuer-cli/)
 - for remote inputs, use `--request "$(curl -fsSL <raw-url>)"` instead of relying on a local example file

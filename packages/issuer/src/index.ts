@@ -4,6 +4,7 @@ export { createIssuer, DemoIssuer } from "./issuer.ts";
 export {
 	createIssuerMetadata,
 	getCredentialIssuerMetadataUrl,
+	serializeCredentialOfferReferenceUri,
 	serializeCredentialOfferUri,
 } from "./openid4vci.ts";
 export {

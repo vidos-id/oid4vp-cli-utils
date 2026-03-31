@@ -95,7 +95,7 @@ Notes:
 	program
 		.command("receive")
 		.description(
-			"Receive and store a credential from an OpenID4VCI credential offer",
+			"Receive and store a credential from an OpenID4VCI credential offer using issuer metadata discovery",
 		)
 		.requiredOption(
 			"--wallet-dir <dir>",
@@ -118,8 +118,12 @@ Examples:
       --offer '{"credential_issuer":"https://issuer.example",...}'
 
 Notes:
-  - Supports by-value credential offers only
-  - Current flow covers the minimal OpenID4VCI subset: pre-authorized code, JWT proof, and single dc+sd-jwt issuance`,
+  - Supports by-value credential_offer and by-reference credential_offer_uri inputs
+  - Resolves issuer metadata from credential_issuer via /.well-known/openid-credential-issuer[issuer-path]
+  - Uses token_endpoint, credential_endpoint, and optional nonce_endpoint from the fetched metadata
+  - Does not hardcode endpoint paths and does not expose manual endpoint overrides
+  - Current flow covers the minimal OpenID4VCI subset: pre-authorized code, JWT proof, and single dc+sd-jwt issuance
+  - A credential_offer_uri is fetched first, then redeemed like an inline offer`,
 		)
 		.action(async (options) => {
 			verbose(`Receiving credential into ${options.walletDir}`);

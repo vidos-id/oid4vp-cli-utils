@@ -105,6 +105,14 @@ describe("issuer metadata and offers", () => {
 			new URL(offerUri).searchParams.get("credential_offer") as string,
 		) as Record<string, unknown>;
 		expect(parsedOffer.credential_issuer).toBe("https://issuer.example");
+
+		const referenceUri = issuer.createCredentialOfferReferenceUri(
+			"https://issuer.example/offers/employee-card-1",
+		);
+		expect(referenceUri.startsWith("openid-credential-offer://?")).toBe(true);
+		expect(new URL(referenceUri).searchParams.get("credential_offer_uri")).toBe(
+			"https://issuer.example/offers/employee-card-1",
+		);
 	});
 });
 

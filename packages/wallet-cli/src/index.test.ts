@@ -274,6 +274,98 @@ describe("wallet-cli", () => {
 		}
 	});
 
+	test("receives and stores a credential from a credential_offer_uri", async () => {
+		const walletDir = await mkdtemp(join(tmpdir(), "wallet-cli-receive-ref-"));
+		try {
+			const issuer = await createOid4VciIssuerFixture();
+			const offerReference =
+				"openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffers%2Fperson-1";
+			let currentGrant: PreAuthorizedGrantRecord | null = null;
+			let currentAccessToken: AccessTokenRecord | null = null;
+			let currentNonce: NonceRecord | null = null;
+
+			await withMockedFetch(
+				async (input, init) => {
+					const url = String(input);
+					if (url === "https://issuer.example/offers/person-1") {
+						const offer = issuer.createCredentialOffer({
+							credential_configuration_id: "person",
+							claims: { given_name: "Ada", family_name: "Lovelace" },
+						});
+						currentGrant = offer.preAuthorizedGrant;
+						return Response.json(offer);
+					}
+					if (
+						url ===
+						"https://issuer.example/.well-known/openid-credential-issuer"
+					) {
+						return Response.json(issuer.getMetadata());
+					}
+					if (url === "https://issuer.example/token") {
+						if (!currentGrant) {
+							throw new Error("Missing offer state");
+						}
+						const body = new URLSearchParams(String(init?.body));
+						const tokenResponse = issuer.exchangePreAuthorizedCode({
+							tokenRequest: {
+								grant_type:
+									"urn:ietf:params:oauth:grant-type:pre-authorized_code",
+								"pre-authorized_code": body.get("pre-authorized_code") ?? "",
+							},
+							preAuthorizedGrant: currentGrant,
+						});
+						currentGrant = tokenResponse.updatedPreAuthorizedGrant;
+						currentAccessToken = tokenResponse.accessTokenRecord;
+						return Response.json(tokenResponse);
+					}
+					if (url === "https://issuer.example/nonce") {
+						expect(init?.method).toBe("POST");
+						const nonce = issuer.createNonce();
+						currentNonce = nonce.nonce;
+						return Response.json({
+							c_nonce: nonce.c_nonce,
+							c_nonce_expires_in: nonce.c_nonce_expires_in,
+						});
+					}
+					if (url === "https://issuer.example/credential") {
+						if (!currentAccessToken || !currentNonce) {
+							throw new Error("Missing token or nonce state");
+						}
+						const request = JSON.parse(String(init?.body)) as {
+							credential_configuration_id: string;
+							proofs: { jwt: Array<{ jwt: string }> };
+						};
+						const proof = await issuer.validateProofJwt({
+							jwt: request.proofs.jwt[0]?.jwt ?? "",
+							nonce: currentNonce,
+						});
+						const issued = await issuer.issueCredential({
+							accessToken: currentAccessToken,
+							credential_configuration_id: request.credential_configuration_id,
+							proof,
+						});
+						currentAccessToken = issued.updatedAccessToken;
+						return Response.json(issued);
+					}
+					throw new Error(`Unexpected fetch ${url}`);
+				},
+				async () => {
+					const result = await receiveCredentialAction({
+						walletDir,
+						offer: offerReference,
+					});
+					expect(result.credential.issuer).toBe("https://issuer.example");
+					expect(result.credential.claims).toEqual({
+						given_name: "Ada",
+						family_name: "Lovelace",
+					});
+				},
+			);
+		} finally {
+			await rm(walletDir, { recursive: true, force: true });
+		}
+	});
+
 	test("rejects presentation exchange input", async () => {
 		const walletDir = await mkdtemp(join(tmpdir(), "wallet-cli-request-"));
 		try {

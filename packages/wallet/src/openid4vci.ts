@@ -34,6 +34,10 @@ const credentialOfferSchema = z.object({
 	}),
 });
 
+const credentialOfferReferenceSchema = z.object({
+	credential_offer_uri: z.string().url(),
+});
+
 const issuerMetadataSchema = z.object({
 	credential_issuer: z.string().url(),
 	token_endpoint: z.string().url(),
@@ -134,7 +138,7 @@ export async function receiveCredentialFromOffer(
 	options?: { fetch?: typeof fetch },
 ): Promise<StoredCredentialRecord> {
 	const doFetch = options?.fetch ?? fetch;
-	const offer = parseCredentialOffer(offerInput);
+	const offer = await resolveCredentialOffer(offerInput, doFetch);
 	const metadata = await fetchIssuerMetadata(offer.credential_issuer, {
 		fetch: doFetch,
 	});
@@ -207,7 +211,37 @@ export async function receiveCredentialFromOffer(
 	});
 }
 
+async function resolveCredentialOffer(
+	input: unknown,
+	doFetch: typeof fetch,
+): Promise<OpenId4VciCredentialOffer> {
+	if (typeof input === "string") {
+		const trimmed = input.trim();
+		if (trimmed.startsWith("openid-credential-offer://")) {
+			const parsed = parseCredentialOfferUriOrReference(trimmed);
+			if ("credential_offer_uri" in parsed) {
+				return fetchCredentialOffer(parsed.credential_offer_uri, doFetch);
+			}
+			return parsed;
+		}
+	}
+
+	return parseCredentialOffer(input);
+}
+
 function parseCredentialOfferUri(input: string): OpenId4VciCredentialOffer {
+	const parsed = parseCredentialOfferUriOrReference(input);
+	if ("credential_offer_uri" in parsed) {
+		throw new WalletError(
+			"Credential offer URI references a remote offer; fetch it via receiveCredentialFromOffer",
+		);
+	}
+	return parsed;
+}
+
+function parseCredentialOfferUriOrReference(
+	input: string,
+): OpenId4VciCredentialOffer | z.infer<typeof credentialOfferReferenceSchema> {
 	let url: URL;
 	try {
 		url = new URL(input);
@@ -221,7 +255,15 @@ function parseCredentialOfferUri(input: string): OpenId4VciCredentialOffer {
 	}
 	const offerUri = getSingleSearchParam(url, "credential_offer_uri");
 	if (offerUri) {
-		throw new WalletError("credential_offer_uri is unsupported");
+		try {
+			return credentialOfferReferenceSchema.parse({
+				credential_offer_uri: offerUri,
+			});
+		} catch {
+			throw new WalletError(
+				"Credential offer URI contains an invalid credential_offer_uri",
+			);
+		}
 	}
 	const encodedOffer = getSingleSearchParam(url, "credential_offer");
 	if (!encodedOffer) {
@@ -234,6 +276,14 @@ function parseCredentialOfferUri(input: string): OpenId4VciCredentialOffer {
 			"Credential offer URI contains invalid credential_offer JSON",
 		);
 	}
+}
+
+async function fetchCredentialOffer(endpoint: string, doFetch: typeof fetch) {
+	const response = await doFetch(endpoint, {
+		headers: { accept: "application/json" },
+	});
+	const json = await parseJsonResponse(response, "credential offer");
+	return credentialOfferSchema.parse(json);
 }
 
 function getCredentialIssuerMetadataUrl(credentialIssuer: string): string {

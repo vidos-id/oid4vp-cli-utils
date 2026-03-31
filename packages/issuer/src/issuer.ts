@@ -12,6 +12,7 @@ import { z } from "zod";
 import { IssuerError } from "./errors.ts";
 import {
 	createIssuerMetadata,
+	serializeCredentialOfferReferenceUri,
 	serializeCredentialOfferUri,
 } from "./openid4vci.ts";
 import {
@@ -279,6 +280,10 @@ export class DemoIssuer {
 
 	createCredentialOfferUri(input: CreateCredentialOfferInput) {
 		return serializeCredentialOfferUri(this.createCredentialOffer(input));
+	}
+
+	createCredentialOfferReferenceUri(credentialOfferUrl: string) {
+		return serializeCredentialOfferReferenceUri(credentialOfferUrl);
 	}
 
 	exchangePreAuthorizedCode(input: ExchangePreAuthorizedCodeInput) {
