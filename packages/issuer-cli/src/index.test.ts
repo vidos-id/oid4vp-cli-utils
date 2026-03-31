@@ -6,6 +6,11 @@ import { generateIssuerTrustMaterial } from "@vidos-id/issuer";
 import { initWalletAction } from "../../wallet-cli/src/index.ts";
 import { issueCredentialAction } from "./index.ts";
 
+const pidClaimsFile = new URL(
+	"../../../examples/pid/pid-minimal.claims.json",
+	import.meta.url,
+).pathname;
+
 describe("issuer-cli", () => {
 	test("issues a credential from claims without explicit proof input", async () => {
 		const tempDir = await mkdtemp(join(tmpdir(), "issuer-cli-"));
@@ -56,7 +61,7 @@ describe("issuer-cli", () => {
 				issuer: "https://issuer.example",
 				issuerDir: tempDir,
 				vct: "urn:eudi:pid:1",
-				claimsFile: "examples/pid/pid-minimal.claims.json",
+				claimsFile: pidClaimsFile,
 			});
 
 			expect(result.format).toBe("dc+sd-jwt");
