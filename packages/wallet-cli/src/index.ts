@@ -9,6 +9,11 @@ import {
 import { interactiveWalletAction } from "./actions/interactive.ts";
 import { createProgram } from "./program.ts";
 
+export {
+	deleteAllCredentialsAction,
+	deleteCredentialAction,
+	deleteWalletAction,
+} from "./actions/delete.ts";
 export { importCredentialAction } from "./actions/import.ts";
 export { initWalletAction } from "./actions/init.ts";
 export { interactiveWalletAction } from "./actions/interactive.ts";

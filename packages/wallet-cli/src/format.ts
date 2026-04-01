@@ -152,6 +152,18 @@ export function formatPresentationSummary(
 	return lines.join("\n");
 }
 
+export function formatDeleteCredentialSummary(credentialId: string): string {
+	return `Deleted credential ${credentialId}`;
+}
+
+export function formatDeleteAllCredentialsSummary(deleted: number): string {
+	return `Deleted ${deleted} credential${deleted === 1 ? "" : "s"}`;
+}
+
+export function formatDeleteWalletSummary(walletDir: string): string {
+	return `Deleted wallet at ${walletDir}`;
+}
+
 function formatValue(value: unknown): string {
 	if (typeof value === "string") {
 		return value;

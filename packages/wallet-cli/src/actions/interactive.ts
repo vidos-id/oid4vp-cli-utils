@@ -4,10 +4,19 @@ import {
 	formatCredentialDetails,
 	formatCredentialList,
 	formatCredentialSummary,
+	formatDeleteAllCredentialsSummary,
+	formatDeleteCredentialSummary,
+	formatDeleteWalletSummary,
 	formatInitResult,
 	formatPresentationSummary,
 } from "../format.ts";
 import { PromptSession } from "../prompts.ts";
+import {
+	deleteAllCredentialsAction,
+	deleteCredentialAction,
+	deleteWalletAction,
+} from "./delete.ts";
+import { chooseCredentialId } from "./delete-helpers.ts";
 import { importCredentialAction } from "./import.ts";
 import { initWalletAction } from "./init.ts";
 import { listCredentialsAction } from "./list.ts";
@@ -19,9 +28,12 @@ const interactiveChoices = [
 	{ label: "Receive credential offer", value: "receive" },
 	{ label: "List credentials", value: "list" },
 	{ label: "Show credential", value: "show" },
+	{ label: "Delete credential", value: "delete" },
+	{ label: "Delete all credentials", value: "delete-all" },
 	{ label: "Present credential", value: "present" },
 	{ label: "Import raw credential", value: "import" },
 	{ label: "Reinitialize wallet", value: "init" },
+	{ label: "Delete wallet initialization", value: "delete-wallet" },
 	{ label: "Switch wallet directory", value: "switch" },
 	{ label: "Exit", value: "exit" },
 ] as const;
@@ -134,18 +146,10 @@ export async function runInteractiveChoice({
 			if (!(await ensureWalletReady(prompt, walletDir))) {
 				return walletDir;
 			}
-			const list = await listCredentialsAction({ walletDir });
-			if (list.credentials.length === 0) {
-				stdout.write("0 credentials found\n\n");
+			const credentialId = await chooseCredentialId(prompt, walletDir);
+			if (credentialId === null) {
 				return walletDir;
 			}
-			const credentialId = await prompt.choose(
-				"Select a credential",
-				list.credentials.map((credential) => ({
-					label: `${credential.id} | ${credential.vct} | ${credential.issuer}`,
-					value: credential.id,
-				})),
-			);
 			const result = await showCredentialAction({
 				walletDir,
 				credentialId,
@@ -164,6 +168,39 @@ export async function runInteractiveChoice({
 			);
 			return walletDir;
 		}
+		case "delete": {
+			if (!(await ensureWalletReady(prompt, walletDir))) {
+				return walletDir;
+			}
+			const credentialId = await chooseCredentialId(prompt, walletDir);
+			if (credentialId === null) {
+				return walletDir;
+			}
+			const confirmed = await prompt.confirm(
+				`Delete credential ${credentialId}?`,
+				false,
+			);
+			if (!confirmed) {
+				stdout.write("Action cancelled.\n\n");
+				return walletDir;
+			}
+			await deleteCredentialAction({ walletDir, credentialId });
+			stdout.write(`${formatDeleteCredentialSummary(credentialId)}\n\n`);
+			return walletDir;
+		}
+		case "delete-all": {
+			if (!(await ensureWalletReady(prompt, walletDir))) {
+				return walletDir;
+			}
+			const confirmed = await prompt.confirm("Delete all credentials?", false);
+			if (!confirmed) {
+				stdout.write("Action cancelled.\n\n");
+				return walletDir;
+			}
+			const result = await deleteAllCredentialsAction({ walletDir });
+			stdout.write(`${formatDeleteAllCredentialsSummary(result.deleted)}\n\n`);
+			return walletDir;
+		}
 		case "present": {
 			if (!(await ensureWalletReady(prompt, walletDir))) {
 				return walletDir;
@@ -177,6 +214,23 @@ export async function runInteractiveChoice({
 			});
 			stdout.write(`${formatPresentationSummary(result)}\n\n`);
 			return walletDir;
+		}
+		case "delete-wallet": {
+			if (!(await walletExists(walletDir))) {
+				stdout.write(`Wallet ${walletDir} is not initialized yet.\n\n`);
+				return walletDir;
+			}
+			const confirmed = await prompt.confirm(
+				`Delete wallet initialization at ${walletDir} and exit?`,
+				false,
+			);
+			if (!confirmed) {
+				stdout.write("Action cancelled.\n\n");
+				return walletDir;
+			}
+			await deleteWalletAction({ walletDir });
+			stdout.write(`${formatDeleteWalletSummary(walletDir)}\n\n`);
+			return undefined;
 		}
 	}
 }

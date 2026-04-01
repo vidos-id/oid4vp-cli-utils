@@ -44,6 +44,11 @@ export const listOptionsSchema = z.object({
 	output: textOutputFormatSchema.default("text"),
 });
 
+export const deleteOptionsSchema = z.object({
+	walletDir: z.string().min(1),
+	credentialId: z.string().min(1),
+});
+
 export const initOptionsSchema = z.object({
 	walletDir: z.string().min(1),
 	alg: z.enum(["ES256", "ES384", "EdDSA"]).optional(),

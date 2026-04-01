@@ -20,6 +20,9 @@ import {
 import { runInteractiveChoice } from "./actions/interactive.ts";
 import {
 	createProgram,
+	deleteAllCredentialsAction,
+	deleteCredentialAction,
+	deleteWalletAction,
 	importCredentialAction,
 	initWalletAction,
 	interactiveWalletAction,
@@ -29,6 +32,46 @@ import {
 	showCredentialAction,
 } from "./index.ts";
 import { FileSystemWalletStorage } from "./storage.ts";
+
+async function seedTwoCredentials(walletDir: string) {
+	const storage = new FileSystemWalletStorage(walletDir);
+	const wallet = new Wallet(storage);
+	const issuer = await createIssuerFixture();
+	const holderKey = await wallet.getOrCreateHolderKey();
+
+	const credentialA = await issueDemoCredential({
+		issuer: issuer.issuer,
+		issuerPrivateJwk: issuer.privateJwk,
+		holderPublicJwk: holderKey.publicJwk as never,
+		vct: "https://example.com/A",
+		claims: { given_name: "Ada" },
+		disclosureFrame: { _sd: ["given_name"] },
+		issuedAt: 1,
+	});
+	const credentialB = await issueDemoCredential({
+		issuer: issuer.issuer,
+		issuerPrivateJwk: issuer.privateJwk,
+		holderPublicJwk: holderKey.publicJwk as never,
+		vct: "https://example.com/B",
+		claims: { family_name: "Lovelace" },
+		disclosureFrame: { _sd: ["family_name"] },
+		issuedAt: 1,
+	});
+
+	const importedA = await importCredentialAction({
+		walletDir,
+		credential: credentialA,
+	});
+	const importedB = await importCredentialAction({
+		walletDir,
+		credential: credentialB,
+	});
+
+	return {
+		storage,
+		credentials: [importedA.credential, importedB.credential],
+	};
+}
 
 async function withMockedFetch(
 	mock: (
@@ -217,6 +260,82 @@ describe("wallet-cli", () => {
 			expect(writes.join("")).toContain("Action cancelled.");
 		} finally {
 			process.stdout.write = originalWrite;
+		}
+	});
+
+	test("deletes an individual credential", async () => {
+		const walletDir = await mkdtemp(join(tmpdir(), "wallet-cli-delete-one-"));
+		try {
+			const { storage, credentials } = await seedTwoCredentials(walletDir);
+
+			await deleteCredentialAction({
+				walletDir,
+				credentialId: credentials[0]!.id,
+			});
+
+			expect(await storage.getCredential(credentials[0]!.id)).toBeNull();
+			expect(await storage.listCredentials()).toHaveLength(1);
+		} finally {
+			await rm(walletDir, { recursive: true, force: true });
+		}
+	});
+
+	test("deletes all credentials", async () => {
+		const walletDir = await mkdtemp(join(tmpdir(), "wallet-cli-delete-all-"));
+		try {
+			const { storage } = await seedTwoCredentials(walletDir);
+
+			await expect(deleteAllCredentialsAction({ walletDir })).resolves.toEqual({
+				deleted: 2,
+			});
+
+			expect(await storage.listCredentials()).toHaveLength(0);
+			expect(await readdir(join(walletDir, "credentials"))).toHaveLength(0);
+		} finally {
+			await rm(walletDir, { recursive: true, force: true });
+		}
+	});
+
+	test("delete wallet interactive choice removes wallet and exits", async () => {
+		const walletDir = await mkdtemp(
+			join(tmpdir(), "wallet-cli-delete-wallet-"),
+		);
+		try {
+			await initWalletAction({ walletDir });
+			const prompt = {
+				confirm: async () => true,
+				text: async () => "",
+				choose: async () => "ES256",
+			} as unknown as Parameters<typeof runInteractiveChoice>[0]["prompt"];
+
+			await expect(
+				runInteractiveChoice({
+					prompt,
+					walletDir,
+					choice: "delete-wallet",
+				}),
+			).resolves.toBeUndefined();
+
+			await expect(readdir(walletDir)).rejects.toMatchObject({
+				code: "ENOENT",
+			});
+		} finally {
+			await rm(walletDir, { recursive: true, force: true });
+		}
+	});
+
+	test("delete wallet action removes wallet directory", async () => {
+		const walletDir = await mkdtemp(
+			join(tmpdir(), "wallet-cli-delete-wallet-action-"),
+		);
+		try {
+			await initWalletAction({ walletDir });
+			await deleteWalletAction({ walletDir });
+			await expect(readdir(walletDir)).rejects.toMatchObject({
+				code: "ENOENT",
+			});
+		} finally {
+			await rm(walletDir, { recursive: true, force: true });
 		}
 	});
 

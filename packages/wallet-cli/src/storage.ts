@@ -1,4 +1,11 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import {
+	mkdir,
+	readdir,
+	readFile,
+	rm,
+	unlink,
+	writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 import {
 	type HolderKeyRecord,
@@ -37,11 +44,13 @@ const isMissingFileError = (error: unknown) =>
 	error instanceof Error && "code" in error && error.code === "ENOENT";
 
 export class FileSystemWalletStorage implements WalletStorage {
+	private readonly walletDir: string;
 	private readonly holderKeyPath: string;
 	private readonly manifestPath: string;
 	private readonly credentialsDir: string;
 
 	constructor(walletDir: string) {
+		this.walletDir = walletDir;
 		this.holderKeyPath = join(walletDir, "holder-key.json");
 		this.manifestPath = join(walletDir, "wallet.json");
 		this.credentialsDir = join(walletDir, "credentials");
@@ -104,6 +113,42 @@ export class FileSystemWalletStorage implements WalletStorage {
 		}
 		manifest.updatedAt = new Date().toISOString();
 		await writeJsonFile(this.manifestPath, manifest);
+	}
+
+	async deleteCredential(id: string): Promise<boolean> {
+		await this.ensureLayout();
+		const manifest = (await this.readManifest()) ?? defaultManifest();
+		const nextCredentials = manifest.credentials.filter(
+			(candidate) => candidate.id !== id,
+		);
+		if (nextCredentials.length === manifest.credentials.length) {
+			return false;
+		}
+
+		await unlinkIfExists(this.credentialPath(id));
+		manifest.credentials = nextCredentials;
+		manifest.updatedAt = new Date().toISOString();
+		await writeJsonFile(this.manifestPath, manifest);
+		return true;
+	}
+
+	async deleteAllCredentials(): Promise<number> {
+		await this.ensureLayout();
+		const manifest = (await this.readManifest()) ?? defaultManifest();
+		const deleted = manifest.credentials.length;
+		await Promise.all(
+			manifest.credentials.map(({ id }) =>
+				unlinkIfExists(this.credentialPath(id)),
+			),
+		);
+		manifest.credentials = [];
+		manifest.updatedAt = new Date().toISOString();
+		await writeJsonFile(this.manifestPath, manifest);
+		return deleted;
+	}
+
+	async deleteWallet(): Promise<void> {
+		await rm(this.walletDir, { recursive: true, force: true });
 	}
 
 	private async ensureLayout(): Promise<void> {
@@ -178,6 +223,17 @@ async function readJsonFile<T>(
 
 async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
 	await writeFile(filePath, JSON.stringify(value, null, 2), "utf8");
+}
+
+async function unlinkIfExists(filePath: string): Promise<void> {
+	try {
+		await unlink(filePath);
+	} catch (error) {
+		if (isMissingFileError(error)) {
+			return;
+		}
+		throw error;
+	}
 }
 
 async function readDirectoryNames(directoryPath: string): Promise<string[]> {
