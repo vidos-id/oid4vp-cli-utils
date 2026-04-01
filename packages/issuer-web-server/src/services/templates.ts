@@ -8,11 +8,15 @@ import {
 	templateSchema,
 	updateTemplateInputSchema,
 } from "@vidos-id/issuer-web-shared";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { IssuerWebDatabase } from "../db/index.ts";
 import { credentialTemplates } from "../db/schema.ts";
 import { forbidden, notFound } from "../errors.ts";
 import { asIsoString, jsonParse, now } from "../utils.ts";
+import {
+	getPredefinedTemplateById,
+	PREDEFINED_TEMPLATES,
+} from "./predefined-templates.ts";
 
 function toTemplate(row: typeof credentialTemplates.$inferSelect): Template {
 	return templateSchema.parse({
@@ -43,20 +47,21 @@ export class TemplateService {
 		const rows = await this.db.query.credentialTemplates.findMany({
 			where: and(
 				eq(credentialTemplates.isActive, true),
-				or(
-					eq(credentialTemplates.ownerUserId, userId),
-					eq(credentialTemplates.kind, "predefined"),
-				),
+				eq(credentialTemplates.kind, "custom"),
+				eq(credentialTemplates.ownerUserId, userId),
 			),
 		});
-		return rows.map(toTemplate);
+		return [...PREDEFINED_TEMPLATES, ...rows.map(toTemplate)];
 	}
 
 	async listActive() {
 		const rows = await this.db.query.credentialTemplates.findMany({
-			where: eq(credentialTemplates.isActive, true),
+			where: and(
+				eq(credentialTemplates.isActive, true),
+				eq(credentialTemplates.kind, "custom"),
+			),
 		});
-		return rows.map(toTemplate);
+		return [...PREDEFINED_TEMPLATES, ...rows.map(toTemplate)];
 	}
 
 	async create(userId: string, input: CreateTemplateInput) {
@@ -118,13 +123,18 @@ export class TemplateService {
 	}
 
 	async getAccessibleById(userId: string, templateId: string) {
+		const predefinedTemplate = getPredefinedTemplateById(templateId);
+		if (predefinedTemplate) {
+			return predefinedTemplate;
+		}
+
 		const row = await this.db.query.credentialTemplates.findFirst({
 			where: eq(credentialTemplates.id, templateId),
 		});
 		if (!row) {
 			throw notFound("Template not found");
 		}
-		if (row.ownerUserId !== userId && row.kind !== "predefined") {
+		if (row.ownerUserId !== userId) {
 			throw forbidden();
 		}
 		return toTemplate(row);
@@ -137,7 +147,7 @@ export class TemplateService {
 		if (!row) {
 			throw notFound("Template not found");
 		}
-		if (row.ownerUserId !== userId || row.kind === "predefined") {
+		if (row.ownerUserId !== userId) {
 			throw forbidden();
 		}
 		await this.db

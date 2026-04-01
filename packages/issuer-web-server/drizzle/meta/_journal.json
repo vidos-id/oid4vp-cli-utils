@@ -29,6 +29,13 @@
 			"when": 1775001000000,
 			"tag": "0003_store_status_list_jwt",
 			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "6",
+			"when": 1775002000000,
+			"tag": "0004_decouple_issuance_template_fk",
+			"breakpoints": true
 		}
 	]
 }

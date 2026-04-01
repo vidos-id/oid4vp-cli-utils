@@ -133,9 +133,7 @@ export const issuances = sqliteTable(
 		ownerUserId: text("owner_user_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
-		templateId: text("template_id")
-			.notNull()
-			.references(() => credentialTemplates.id, { onDelete: "cascade" }),
+		templateId: text("template_id").notNull(),
 		credentialConfigurationId: text("credential_configuration_id").notNull(),
 		vct: text("vct").notNull(),
 		claimsJson: text("claims_json").notNull(),

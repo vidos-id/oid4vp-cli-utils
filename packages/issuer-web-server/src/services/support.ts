@@ -1,15 +1,14 @@
 import { createIssuer, type StatusListRecord } from "@vidos-id/issuer";
 import type { AppContext } from "../context.ts";
 import { buildCredentialConfiguration, parseJwk } from "../utils.ts";
+import { TemplateService } from "./templates.ts";
 
 export async function buildIssuerInstance(app: AppContext) {
 	const config = await app.db.query.issuerConfig.findFirst();
 	const signingKey = await app.db.query.issuerSigningKeys.findFirst({
 		where: (fields, operators) => operators.eq(fields.isActive, true),
 	});
-	const templates = await app.db.query.credentialTemplates.findMany({
-		where: (fields, operators) => operators.eq(fields.isActive, true),
-	});
+	const templates = await new TemplateService(app.db).listActive();
 	if (!config || !signingKey) {
 		throw new Error("Issuer bootstrap is incomplete");
 	}
