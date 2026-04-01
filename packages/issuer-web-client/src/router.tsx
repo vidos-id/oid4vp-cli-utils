@@ -12,14 +12,15 @@ import { CreateIssuancePage } from "./routes/create-issuance.tsx";
 import { CreateTemplatePage } from "./routes/create-template.tsx";
 import { DashboardPage } from "./routes/dashboard.tsx";
 import { IssuanceDetailPage } from "./routes/issuance-detail.tsx";
+import { MetadataPage } from "./routes/metadata.tsx";
 import { SignInPage } from "./routes/signin.tsx";
 import { SignUpPage } from "./routes/signup.tsx";
 
 const rootRoute = createRootRoute({
 	component: () => (
-		<div className="min-h-screen">
+		<div className="flex min-h-screen flex-col">
 			<AppHeader />
-			<main className="mx-auto max-w-5xl px-6 py-8">
+			<main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
 				<Outlet />
 			</main>
 			<TanStackRouterDevtools position="bottom-right" />
@@ -75,6 +76,12 @@ const createTemplateRoute = createRoute({
 	component: CreateTemplatePage,
 });
 
+const metadataRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: "/metadata",
+	component: MetadataPage,
+});
+
 const routeTree = rootRoute.addChildren([
 	dashboardRoute,
 	signinRoute,
@@ -82,6 +89,7 @@ const routeTree = rootRoute.addChildren([
 	createTemplateRoute,
 	createIssuanceRoute,
 	issuanceDetailRoute,
+	metadataRoute,
 ]);
 
 export const router = createRouter({ routeTree });

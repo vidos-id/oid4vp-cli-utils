@@ -11,7 +11,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useEffect, useState } from "react";
 import { AuthForm } from "../components/auth-form.tsx";
 import { IssuanceList } from "../components/issuance-list.tsx";
-import { PageHeader, Section } from "../components/layout.tsx";
+import { PageShell, Section } from "../components/layout.tsx";
 import { TemplateList } from "../components/template-list.tsx";
 import type { BadgeVariant } from "../components/ui/badge.tsx";
 import { Badge } from "../components/ui/badge.tsx";
@@ -146,12 +146,8 @@ export function DashboardPage() {
 		return () => window.clearInterval(interval);
 	}, [data?.user, isPending, router]);
 
-	if (isPending || !data?.user) {
-		return <p className="text-sm text-muted-foreground">Loading...</p>;
-	}
-
 	const isAnonymous =
-		"isAnonymous" in data.user && Boolean(data.user.isAnonymous);
+		data?.user && "isAnonymous" in data.user && Boolean(data.user.isAnonymous);
 	const openIssuances = issuances.filter(
 		(issuance) => issuance.state !== "redeemed",
 	);
@@ -159,94 +155,98 @@ export function DashboardPage() {
 		(issuance) => issuance.state === "redeemed",
 	);
 
+	const description =
+		isPending || !data?.user
+			? undefined
+			: isAnonymous
+				? "You are using a guest workspace. Everything here is temporary until you link an account."
+				: "Issue verifiable credentials from your templates.";
+
 	return (
-		<>
-			<PageHeader
-				title="Overview"
-				description={
-					isAnonymous
-						? "You are using a guest workspace. Everything here is temporary until you link an account."
-						: "Issue verifiable credentials from your templates."
-				}
-			/>
+		<PageShell title="Overview" description={description}>
+			{isPending || !data?.user ? (
+				<p className="text-sm text-muted-foreground">Loading...</p>
+			) : (
+				<>
+					{isAnonymous ? <LinkAccountCard router={router} /> : null}
 
-			{isAnonymous ? <LinkAccountCard router={router} /> : null}
-
-			<div className="space-y-10">
-				<Section
-					title="Templates"
-					description="Choose a template to open a prefilled issuance flow, or delete custom templates you no longer need."
-					actions={
-						<Button
-							variant="outline"
-							type="button"
-							onClick={() => {
-								void router.navigate({ to: "/templates/create" });
-							}}
+					<div className="space-y-10">
+						<Section
+							title="Templates"
+							description="Choose a template to open a prefilled issuance flow, or delete custom templates you no longer need."
+							actions={
+								<Button
+									variant="outline"
+									type="button"
+									onClick={() => {
+										void router.navigate({ to: "/templates/create" });
+									}}
+								>
+									Create template
+								</Button>
+							}
 						>
-							Create template
-						</Button>
-					}
-				>
-					<TemplateList
-						templates={templates}
-						onDelete={(templateId) => {
-							void (async () => {
-								const response = await api.deleteTemplate(templateId);
-								if (response.ok) {
-									await refreshDashboardData(setTemplates, setIssuances);
-								}
-							})();
-						}}
-						onUseTemplate={(templateId) => {
-							void router.navigate({
-								to: "/issuances/create/$templateId",
-								params: { templateId },
-							});
-						}}
-						showDelete
-					/>
-				</Section>
+							<TemplateList
+								templates={templates}
+								onDelete={(templateId) => {
+									void (async () => {
+										const response = await api.deleteTemplate(templateId);
+										if (response.ok) {
+											await refreshDashboardData(setTemplates, setIssuances);
+										}
+									})();
+								}}
+								onUseTemplate={(templateId) => {
+									void router.navigate({
+										to: "/issuances/create/$templateId",
+										params: { templateId },
+									});
+								}}
+								showDelete
+							/>
+						</Section>
 
-				<Section
-					title="Redeemed credentials"
-					description="Manage status for credentials that have already been claimed by a wallet."
-				>
-					{redeemedIssuances.length === 0 ? (
-						<IssuanceList issuances={redeemedIssuances} />
-					) : (
-						<div className="divide-y rounded-md border">
-							{redeemedIssuances.map((issuance) => (
-								<IssuanceRow
-									key={issuance.id}
-									issuance={issuance}
-									onUpdateStatus={updateIssuanceStatus}
-								/>
-							))}
-						</div>
-					)}
-				</Section>
+						<Section
+							title="Redeemed credentials"
+							description="Manage status for credentials that have already been claimed by a wallet."
+						>
+							{redeemedIssuances.length === 0 ? (
+								<IssuanceList issuances={redeemedIssuances} />
+							) : (
+								<div className="divide-y rounded-md border">
+									{redeemedIssuances.map((issuance) => (
+										<IssuanceRow
+											key={issuance.id}
+											issuance={issuance}
+											onUpdateStatus={updateIssuanceStatus}
+										/>
+									))}
+								</div>
+							)}
+						</Section>
 
-				<Section
-					title="Open offers"
-					description="Track credential offers live while they move from offered to redeemed, or expire before redemption."
-				>
-					{openIssuances.length === 0 ? (
-						<IssuanceList issuances={openIssuances} />
-					) : (
-						<div className="divide-y rounded-md border">
-							{openIssuances.map((issuance) => (
-								<IssuanceRow
-									key={issuance.id}
-									issuance={issuance}
-									onUpdateStatus={updateIssuanceStatus}
-								/>
-							))}
-						</div>
-					)}
-				</Section>
-			</div>
-		</>
+						<Section
+							title="Open offers"
+							description="Track credential offers live while they move from offered to redeemed, or expire before redemption."
+						>
+							{openIssuances.length === 0 ? (
+								<IssuanceList issuances={openIssuances} />
+							) : (
+								<div className="divide-y rounded-md border">
+									{openIssuances.map((issuance) => (
+										<IssuanceRow
+											key={issuance.id}
+											issuance={issuance}
+											onUpdateStatus={updateIssuanceStatus}
+										/>
+									))}
+								</div>
+							)}
+						</Section>
+					</div>
+				</>
+			)}
+		</PageShell>
 	);
 
 	function updateIssuanceStatus(issuanceId: string, status: 0 | 1 | 2) {

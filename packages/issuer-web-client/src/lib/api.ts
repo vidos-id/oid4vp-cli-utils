@@ -13,6 +13,7 @@ async function request<T>(path: string, init?: RequestInit) {
 }
 
 export const api = {
+	getMetadata: () => request("/.well-known/openid-credential-issuer"),
 	listTemplates: () => request("/api/templates"),
 	createTemplate: (json: unknown) =>
 		request("/api/templates", {

@@ -1,7 +1,6 @@
-import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { PageHeader } from "../components/layout.tsx";
+import { PageShell } from "../components/layout.tsx";
 import { TemplateForm } from "../components/template-form.tsx";
 import { api } from "../lib/api.ts";
 import { authClient } from "../lib/auth.ts";
@@ -24,43 +23,36 @@ export function CreateTemplatePage() {
 		}
 	}, [data?.user, isPending, navigate]);
 
-	if (isPending || !data?.user) {
-		return <p className="text-sm text-muted-foreground">Loading...</p>;
-	}
-
 	return (
-		<>
-			<Link
-				to="/"
-				className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-			>
-				<ArrowLeft className="h-3.5 w-3.5" />
-				Back to overview
-			</Link>
-			<PageHeader
-				title="Create template"
-				description="Define a reusable credential template and default claims for future issuances."
-			/>
-			<TemplateForm
-				claims={templateClaims}
-				name={templateName}
-				onClaimsChange={setTemplateClaims}
-				onNameChange={setTemplateName}
-				onSubmit={() => {
-					void (async () => {
-						const response = await api.createTemplate({
-							name: templateName,
-							vct: templateVct,
-							defaultClaims: JSON.parse(templateClaims),
-						});
-						if (response.ok) {
-							void navigate({ to: "/" });
-						}
-					})();
-				}}
-				onVctChange={setTemplateVct}
-				vct={templateVct}
-			/>
-		</>
+		<PageShell
+			title="Create template"
+			description="Define a reusable credential template and default claims for future issuances."
+			back={{ to: "/", label: "Back to overview" }}
+		>
+			{isPending || !data?.user ? (
+				<p className="text-sm text-muted-foreground">Loading...</p>
+			) : (
+				<TemplateForm
+					claims={templateClaims}
+					name={templateName}
+					onClaimsChange={setTemplateClaims}
+					onNameChange={setTemplateName}
+					onSubmit={() => {
+						void (async () => {
+							const response = await api.createTemplate({
+								name: templateName,
+								vct: templateVct,
+								defaultClaims: JSON.parse(templateClaims),
+							});
+							if (response.ok) {
+								void navigate({ to: "/" });
+							}
+						})();
+					}}
+					onVctChange={setTemplateVct}
+					vct={templateVct}
+				/>
+			)}
+		</PageShell>
 	);
 }

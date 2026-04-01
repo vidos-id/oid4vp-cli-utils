@@ -22,6 +22,7 @@ export function AppHeader() {
 					<>
 						<nav className="flex items-center gap-1">
 							<NavLink to="/">Overview</NavLink>
+							<NavLink to="/metadata">Metadata</NavLink>
 						</nav>
 
 						<div className="ml-auto flex items-center gap-3">

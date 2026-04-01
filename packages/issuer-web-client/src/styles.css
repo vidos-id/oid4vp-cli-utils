@@ -52,6 +52,11 @@
 
 	html {
 		color-scheme: light;
+		/* Prevent horizontal-overflow shifts from wide content (e.g. <pre>). */
+		overflow-x: hidden;
+		/* Always reserve space for the vertical scrollbar so mx-auto centering
+		   never shifts when content height changes between routes. */
+		scrollbar-gutter: stable;
 	}
 
 	html.dark {

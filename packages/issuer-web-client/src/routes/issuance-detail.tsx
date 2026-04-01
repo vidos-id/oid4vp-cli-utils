@@ -1,9 +1,8 @@
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import type { IssuanceDetail } from "@vidos-id/issuer-web-shared";
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { IssuanceDetailCard } from "../components/issuance-detail.tsx";
-import { PageHeader } from "../components/layout.tsx";
+import { PageShell } from "../components/layout.tsx";
 import { api } from "../lib/api.ts";
 import { authClient } from "../lib/auth.ts";
 
@@ -53,24 +52,19 @@ export function IssuanceDetailPage() {
 		};
 	}, [data?.user, issuanceId, isPending, navigate]);
 
-	if (isPending || !data?.user || !detail) {
-		return <p className="text-sm text-muted-foreground">Loading issuance...</p>;
-	}
-
 	return (
-		<>
-			<Link
-				to="/"
-				className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-			>
-				<ArrowLeft className="h-3.5 w-3.5" />
-				Back to overview
-			</Link>
-			<PageHeader
-				title="Issuance detail"
-				description={`Credential type: ${detail.issuance.vct}`}
-			/>
-			<IssuanceDetailCard detail={detail} />
-		</>
+		<PageShell
+			title="Issuance detail"
+			description={
+				detail ? `Credential type: ${detail.issuance.vct}` : undefined
+			}
+			back={{ to: "/", label: "Back to overview" }}
+		>
+			{isPending || !data?.user || !detail ? (
+				<p className="text-sm text-muted-foreground">Loading issuance...</p>
+			) : (
+				<IssuanceDetailCard detail={detail} />
+			)}
+		</PageShell>
 	);
 }

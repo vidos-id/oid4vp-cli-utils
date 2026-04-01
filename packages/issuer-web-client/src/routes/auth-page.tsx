@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AuthForm } from "../components/auth-form.tsx";
+import { PageShell } from "../components/layout.tsx";
 import { Button } from "../components/ui/button.tsx";
 import {
 	authClient,
@@ -28,18 +29,11 @@ export function AuthPage(props: { mode: AuthMode }) {
 	}, [data?.user, isPending]);
 
 	return (
-		<div className="mx-auto max-w-sm pt-20">
-			<div className="mb-6">
-				<h1 className="text-2xl font-semibold tracking-tight">
-					{props.mode === "signup" ? "Create account" : "Sign in"}
-				</h1>
-				<p className="mt-1 text-sm text-muted-foreground">
-					Free demo access for testing. No obligation, and data persistence is
-					not guaranteed.
-				</p>
-			</div>
-
-			<div className="space-y-6">
+		<PageShell
+			title={props.mode === "signup" ? "Create account" : "Sign in"}
+			description="Free demo access for testing. No obligation, and data persistence is not guaranteed."
+		>
+			<div className="max-w-sm space-y-6">
 				{props.mode === "signin" ? (
 					<>
 						{/* Anonymous option first - primary action for quick start */}
@@ -144,6 +138,6 @@ export function AuthPage(props: { mode: AuthMode }) {
 					}}
 				/>
 			</div>
-		</div>
+		</PageShell>
 	);
 }
