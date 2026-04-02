@@ -33,7 +33,7 @@
 	"scripts": {
 		"build": "tsdown",
 		"check-types": "tsc --noEmit --project ../../tsconfig.json",
-		"package-publish": "npm publish",
+		"package-publish": "npm publish --provenance",
 		"test": "bun --conditions=development test --pass-with-no-tests"
 	},
 	"files": [
