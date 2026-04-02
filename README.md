@@ -1,5 +1,7 @@
 # openid4vc-tools
 
+[![Release](https://img.shields.io/github/actions/workflow/status/vidos-id/openid4vc-tools/release.yml?branch=main&label=release)](https://github.com/vidos-id/openid4vc-tools/actions/workflows/release.yml) [![npm issuer](https://img.shields.io/npm/v/%40vidos-id%2Fopenid4vc-issuer?label=issuer)](https://www.npmjs.com/package/@vidos-id/openid4vc-issuer) [![npm wallet](https://img.shields.io/npm/v/%40vidos-id%2Fopenid4vc-wallet?label=wallet)](https://www.npmjs.com/package/@vidos-id/openid4vc-wallet) [![npm issuer-cli](https://img.shields.io/npm/v/%40vidos-id%2Fopenid4vc-issuer-cli?label=issuer-cli)](https://www.npmjs.com/package/@vidos-id/openid4vc-issuer-cli) [![npm wallet-cli](https://img.shields.io/npm/v/%40vidos-id%2Fopenid4vc-wallet-cli?label=wallet-cli)](https://www.npmjs.com/package/@vidos-id/openid4vc-wallet-cli)
+
 Tools for testing OpenID4VC flows across issuer and wallet roles.
 
 This repo contains libraries, CLI wrappers, and web applications that can be used to exercise credential issuance, wallet receipt and storage, and OpenID4VP presentation flows.

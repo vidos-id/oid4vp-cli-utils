@@ -30,12 +30,14 @@
 		"dev:issuer-web-client": "turbo dev --filter='@vidos-id/openid4vc-issuer-web-client'",
 		"dev:issuer-web-server": "turbo dev --filter='@vidos-id/openid4vc-issuer-web-server'",
 		"package-publish": "turbo package-publish --filter='@vidos-id/openid4vc-cli-common' --filter='@vidos-id/openid4vc-wallet' --filter='@vidos-id/openid4vc-issuer' --filter='@vidos-id/openid4vc-issuer-web-shared' --filter='@vidos-id/openid4vc-wallet-cli' --filter='@vidos-id/openid4vc-issuer-cli'",
+		"release:notes": "bun scripts/generate-release-notes.ts",
 		"release:version": "bun scripts/release-version.ts",
 		"test": "turbo test",
 		"lint": "biome check --write ."
 	},
 	"packageManager": "bun@1.3.10",
 	"dependencies": {
+		"@ai-sdk/openai-compatible": "^2.0.37",
 		"@hono/client": "^0.0.3",
 		"@hono/zod-validator": "^0.7.6",
 		"@sd-jwt/core": "^0.19.0",
@@ -45,6 +47,7 @@
 		"@sd-jwt/sd-jwt-vc": "^0.19.0",
 		"@tanstack/react-router": "^1.168.8",
 		"@tanstack/react-router-devtools": "^1.166.11",
+		"ai": "^6.0.143",
 		"better-auth": "^1.5.6",
 		"commander": "^14.0.3",
 		"dcql": "^3.0.0",
