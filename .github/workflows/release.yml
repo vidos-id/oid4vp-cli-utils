@@ -85,6 +85,8 @@ jobs:
       - name: Publish npm packages
         env:
           NPM_CONFIG_TAG: ${{ env.NPM_DIST_TAG }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
         run: bun run package-publish
 
       - name: Push release commit and tag
