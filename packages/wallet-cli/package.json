@@ -1,7 +1,7 @@
 {
 	"name": "@vidos-id/openid4vc-wallet-cli",
 	"description": "CLI for dc+sd-jwt wallet storage and OpenID4VP presentation.",
-	"version": "0.0.0-rc.1",
+	"version": "0.10.0",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/vidos-id/openid4vc-tools.git",
@@ -41,8 +41,8 @@
 		"README.md"
 	],
 	"dependencies": {
-		"@vidos-id/openid4vc-cli-common": "0.0.0-rc.1",
-		"@vidos-id/openid4vc-wallet": "0.0.0-rc.1",
+		"@vidos-id/openid4vc-cli-common": "0.10.0",
+		"@vidos-id/openid4vc-wallet": "0.10.0",
 		"commander": "^14.0.3",
 		"inquirer": "^12.9.6",
 		"zod": "^4.3.6"
