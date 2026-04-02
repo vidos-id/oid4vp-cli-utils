@@ -2,6 +2,10 @@
 
 React + Vite SPA for the demo issuer web application.
 
+This package provides the browser UI for issuer-side testing workflows. It uses the issuer web server for authentication, template management, issuance creation, and QR-based wallet handoff.
+
+Use it when you want a visual issuer app instead of driving the same flows through `openid4vc-issuer`.
+
 ## Local Dev
 
 Uses committed local defaults from `.env.local`:
@@ -35,6 +39,8 @@ Build and deploy this package as a static SPA. Point it at the independently dep
 - custom template creation
 - issuance list and detail routes
 - QR rendering for wallet handoff
+
+The same issuer workflows are also exposed through the CLI package for terminal-based testing.
 
 ## Routes
 

@@ -1,48 +1,38 @@
 # openid4vc-tools
 
-CLI tools for quick `dc+sd-jwt` credential issuance, holding, and OpenID4VP presentation.
+Tools for testing OpenID4VC flows across issuer and wallet roles.
 
-Built for simple, scriptable credential flows -- primarily created as a PoC for making wallet operations CLI-consumable so they can be driven by AI agents like [OpenClaw](https://openclaw.ai/) 🦞.
+This repo contains libraries, CLI wrappers, and web applications that can be used to exercise credential issuance, wallet receipt and storage, and OpenID4VP presentation flows.
 
-The repo also supports a minimal OpenID4VCI direct issuance subset: by-value credential offers, pre-authorized-code token exchange, issuer nonce retrieval, JWT proof-of-possession, single `dc+sd-jwt` issuance, and direct wallet import.
+Current focus:
+
+- issuer-side testing with a small issuer library and issuer web app
+- wallet-side testing with a wallet library and terminal wallet flows
+- end-to-end demos for OpenID4VCI and OpenID4VP-style interactions
+- scriptable tooling suitable for local development, demos, and protocol exploration
 
 ## Packages
 
 | Package | Description |
 |---------|-------------|
-| [`@vidos-id/openid4vc-issuer-cli`](packages/issuer-cli/) | Terminal client for `openid4vc-issuer-web-server` |
-| [`@vidos-id/openid4vc-wallet-cli`](packages/wallet-cli/) | Hold credentials and create OpenID4VP presentations |
-| [`@vidos-id/openid4vc-issuer`](packages/issuer/) | Issuer library used by the CLI and Bun consumers |
-| [`@vidos-id/openid4vc-wallet`](packages/wallet/) | Wallet library used by the CLI and Bun consumers |
-| [`@vidos-id/openid4vc-cli-common`](packages/cli-common/) | Shared CLI utilities published for the CLI packages |
+| [`@vidos-id/openid4vc-issuer`](packages/issuer/) | Issuer library for test and demo issuance flows |
+| [`@vidos-id/openid4vc-wallet`](packages/wallet/) | Wallet library for receipt, storage, and presentation flows |
+| [`@vidos-id/openid4vc-issuer-cli`](packages/issuer-cli/) | Terminal client for the issuer web server |
+| [`@vidos-id/openid4vc-wallet-cli`](packages/wallet-cli/) | Terminal wallet for receive, inspect, and present flows |
+| [`@vidos-id/openid4vc-issuer-web-server`](packages/issuer-web-server/) | Bun + Hono issuer API for the web app and CLI |
+| [`@vidos-id/openid4vc-issuer-web-client`](packages/issuer-web-client/) | React web app for issuer-side testing workflows |
+| [`@vidos-id/openid4vc-issuer-web-shared`](packages/issuer-web-shared/) | Shared types and schemas for the issuer web packages |
+| [`@vidos-id/openid4vc-cli-common`](packages/cli-common/) | Shared CLI helpers |
 
 ## Install
 
-Library packages and CLI packages are published to GitHub Packages under the `@vidos-id` scope. Release artifacts are also published on GitHub Releases as Bun-executable single-file CLIs.
+Published packages use the `@vidos-id` scope on GitHub Packages. CLI release artifacts are published on GitHub Releases as Bun-executable single-file binaries.
 
 Requirements:
 
 - [Bun](https://bun.sh/) installed
 
-### GitHub Packages
-
-Configure the `@vidos-id` scope in the consuming repo or your user config.
-
-With `.npmrc`:
-
-```ini
-@vidos-id:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GITHUB_PACKAGES_TOKEN}
-```
-
-With `bunfig.toml`:
-
-```toml
-[install.scopes]
-"@vidos-id" = { url = "https://npm.pkg.github.com", token = "$GITHUB_PACKAGES_TOKEN" }
-```
-
-Install the libraries with your preferred package manager:
+### Libraries
 
 ```bash
 # bun
@@ -58,9 +48,7 @@ pnpm add @vidos-id/openid4vc-wallet @vidos-id/openid4vc-issuer
 yarn add @vidos-id/openid4vc-wallet @vidos-id/openid4vc-issuer
 ```
 
-### GitHub CLI Releases
-
-Download the latest release assets:
+### CLI Releases
 
 ```bash
 # openid4vc-wallet
@@ -72,133 +60,39 @@ curl -L -o openid4vc-issuer https://github.com/vidos-id/openid4vc-tools/releases
 chmod +x openid4vc-issuer
 ```
 
-Run them directly:
+## Local Dev
 
 ```bash
-./openid4vc-wallet --help
-./openid4vc-issuer --help
+bun install
+bun run dev:issuer-web
 ```
 
-Optional: install globally on your machine by moving them onto your `PATH`:
+Or run individual entry points:
 
 ```bash
-mv openid4vc-wallet ~/.local/bin/openid4vc-wallet
-mv openid4vc-issuer ~/.local/bin/openid4vc-issuer
-```
-
-These artifacts are built for Bun and do not require GitHub Packages registry configuration.
-
-Note: the GitHub Release assets only contain the CLIs, not the `examples/` directory. When using the installed CLIs, either supply your own local files or fetch example inputs from the repo's raw GitHub URLs.
-
-For development in this repo, you can run the package bin entry directly with Bun:
-
-```bash
-bun packages/wallet-cli/src/index.ts --help
-bun packages/issuer-cli/src/index.ts --help
-```
-
-## Quick Start
-
-Use the CLIs for end-to-end flows rather than re-implementing protocol steps in agent code. `openid4vc-issuer` now works as a client of `openid4vc-issuer-web-server`, while `openid4vc-wallet` keeps wallet-side receipt, storage, and presentation concerns. `openid4vc-wallet receive` is the primary way to add credentials into a wallet.
-
-The minimal server-backed flow:
-
-```bash
-# 1. Start the issuer web server
 bun run --filter '@vidos-id/openid4vc-issuer-web-server' dev
-
-# 2. Initialize a wallet
-./openid4vc-wallet init --wallet-dir .demo/wallet
-
-# 3. Sign into the issuer app from the terminal
-./openid4vc-issuer auth signin --anonymous
-
-# 4. Create a template
-./openid4vc-issuer templates create \
-  --name "PID" \
-  --vct urn:eudi:pid:1 \
-  --claims "$(curl -fsSL https://raw.githubusercontent.com/vidos-id/openid4vc-tools/main/examples/pid/pid-minimal.claims.json)"
-
-# 5. Create an issuance offer from that template
-./openid4vc-issuer issuances create \
-  --template-id <template-id> \
-  --claims '{"issuing_state":"demo"}'
-
-# 6. Redeem that offer with the wallet
-./openid4vc-wallet receive \
-  --wallet-dir .demo/wallet \
-  --offer 'openid-credential-offer://?...'
+bun run --filter '@vidos-id/openid4vc-issuer-web-client' dev
+bun packages/issuer-cli/src/index.ts --help
+bun packages/wallet-cli/src/index.ts --help
 ```
 
-Both CLIs also support interactive mode by default when run with no subcommand:
-
-```bash
-./openid4vc-issuer
-./openid4vc-wallet
-```
-
-Then present it:
-
-```bash
-./openid4vc-wallet present \
-  --wallet-dir .demo/wallet \
-  --request "$(curl -fsSL https://raw.githubusercontent.com/vidos-id/openid4vc-tools/main/examples/pid/pid-basic-request.json)"
-```
-
-Or from an `openid4vp://` authorization URL:
-
-```bash
-./openid4vc-wallet present \
-  --wallet-dir .demo/wallet \
-  --request 'openid4vp://authorize?client_id=https%3A%2F%2Fverifier.example&nonce=n-1&response_type=vp_token&dcql_query=...'
-```
-
-See [`@vidos-id/openid4vc-issuer-cli`](packages/issuer-cli/) and [`@vidos-id/openid4vc-wallet-cli`](packages/wallet-cli/README.md) for full command reference.
-
-## Minimal OID4VCI
-
-Wallet-side offer redemption is exposed through `openid4vc-wallet receive`, and that is the primary ingest path for credentials.
-
-Example:
-
-```bash
-openid4vc-wallet receive \
-  --wallet-dir .demo/wallet \
-  --offer 'openid-credential-offer://?credential_offer=...'
-```
-
-For supported inputs, behavior, and command options, see [`packages/wallet-cli/README.md`](packages/wallet-cli/README.md) or run `openid4vc-wallet receive --help`.
-
-## Interactive Issuer Flow
-
-`openid4vc-issuer` also supports an interactive menu-driven mode by default when you run it without a subcommand:
-
-```bash
-./openid4vc-issuer
-```
-
-It can sign in, create templates, create issuance offers, inspect offer URIs, and update issuance status without having to remember every command flag.
-
-## End-To-End Demo Script
+## Demos
 
 ```bash
 bun scripts/demo-e2e.ts
 bun scripts/demo-oid4vci-e2e.ts
 ```
 
-Runs the full flow programmatically: creates an issuance flow, receives a credential, and creates a presentation.
+Example payloads live in [`examples/pid/`](examples/pid/).
 
-The OID4VCI demo exercises by-value credential offers, metadata discovery, pre-authorized-code exchange, nonce-based proof creation, direct issuance, and wallet storage.
+## Docs
 
-## Example Inputs
-
-Reusable example payloads live in `examples/pid/` in this repo and can also be fetched from raw GitHub:
-
-- `pid-minimal.claims.json` - minimal PID-style SD-JWT VC claims - `https://raw.githubusercontent.com/vidos-id/openid4vc-tools/main/examples/pid/pid-minimal.claims.json`
-- `pid-full.claims.json` - broader PID-style SD-JWT VC claims - `https://raw.githubusercontent.com/vidos-id/openid4vc-tools/main/examples/pid/pid-full.claims.json`
-- `pid-basic-request.json` - basic PID DCQL request - `https://raw.githubusercontent.com/vidos-id/openid4vc-tools/main/examples/pid/pid-basic-request.json`
-- `pid-address-request.json` - address-focused PID DCQL request - `https://raw.githubusercontent.com/vidos-id/openid4vc-tools/main/examples/pid/pid-address-request.json`
-- `pid-basic.openid4vp.txt` - by-value `openid4vp://` authorization URL example - `https://raw.githubusercontent.com/vidos-id/openid4vc-tools/main/examples/pid/pid-basic.openid4vp.txt`
+- issuer library: [`packages/issuer/README.md`](packages/issuer/README.md)
+- wallet library: [`packages/wallet/README.md`](packages/wallet/README.md)
+- issuer CLI: [`packages/issuer-cli/README.md`](packages/issuer-cli/README.md)
+- wallet CLI: [`packages/wallet-cli/README.md`](packages/wallet-cli/README.md)
+- issuer web server: [`packages/issuer-web-server/README.md`](packages/issuer-web-server/README.md)
+- issuer web client: [`packages/issuer-web-client/README.md`](packages/issuer-web-client/README.md)
 
 ## Validate
 
@@ -207,12 +101,3 @@ bun test
 bun run check-types
 bun run lint
 ```
-
-## Notes
-
-- `dc+sd-jwt` format only
-- minimal OpenID4VCI direct issuance only; advanced OID4VCI/HAIP features are intentionally unsupported
-- DCQL only, no Presentation Exchange
-- `openid4vp://` limited to by-value requests with `client_id`, `nonce`, and `dcql_query`
-- wallet trust store for verifiers/readers is out of scope
-- issuer web server owns issuer state and protocol endpoints; `openid4vc-issuer` is only an app client

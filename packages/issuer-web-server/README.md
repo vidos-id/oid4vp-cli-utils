@@ -2,6 +2,15 @@
 
 Hono + Bun API for the demo issuer web application.
 
+This package backs both the issuer web client and the `openid4vc-issuer` CLI. It owns issuer-side state, authentication, template management, issuance records, and the protocol endpoints used during testing flows.
+
+Primary responsibilities:
+
+- expose issuer metadata and credential endpoints
+- manage templates and issuances for the app and CLI
+- persist issuer-side state in a local database
+- provide the server surface for wallet handoff during local testing
+
 ## Local Dev
 
 Uses committed local defaults from `.env.local`:
@@ -23,6 +32,8 @@ Default URL:
 ## Deployment
 
 Deploy this package as an independent Bun service.
+
+The web client and CLI can both target the same deployed server.
 
 ## Environment
 
