@@ -391,14 +391,17 @@ describe("issuer web server", () => {
 		expect(issuanceResponse.status).toBe(200);
 		const storedIssuance = await context.db.query.issuances.findFirst();
 		expect(storedIssuance?.preAuthorizedCode).toBeTruthy();
+		if (!storedIssuance?.preAuthorizedCode) {
+			throw new Error("Expected issuance with a pre-authorized code");
+		}
 
 		const first = await exchangePreAuthorizedCode(
 			fetchImpl,
-			storedIssuance!.preAuthorizedCode,
+			storedIssuance.preAuthorizedCode,
 		);
 		const second = await exchangePreAuthorizedCode(
 			fetchImpl,
-			storedIssuance!.preAuthorizedCode,
+			storedIssuance.preAuthorizedCode,
 		);
 
 		expect(second.access_token).toBe(first.access_token);
@@ -436,8 +439,11 @@ describe("issuer web server", () => {
 
 		const grant = await context.db.query.preAuthorizedGrants.findFirst();
 		expect(grant).toBeTruthy();
+		if (!grant) {
+			throw new Error("Expected a stored pre-authorized grant");
+		}
 		const ttlSeconds = Math.round(
-			(grant!.expiresAt.getTime() - Date.now()) / 1000,
+			(grant.expiresAt.getTime() - Date.now()) / 1000,
 		);
 		expect(ttlSeconds).toBeGreaterThan(7190);
 		expect(ttlSeconds).toBeLessThanOrEqual(7200);
@@ -516,7 +522,10 @@ describe("issuer web server", () => {
 		const statusListRow = await context.db.query.statusLists.findFirst({
 			where: eq(statusLists.id, created.issuance.statusListId),
 		});
-		const statuses = JSON.parse(statusListRow!.statusesJson) as number[];
+		if (!statusListRow) {
+			throw new Error("Expected stored status list row");
+		}
+		const statuses = JSON.parse(statusListRow.statusesJson) as number[];
 		statuses[created.issuance.statusListIndex] = 2;
 
 		await context.db

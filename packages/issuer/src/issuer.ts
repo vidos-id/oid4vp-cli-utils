@@ -21,7 +21,6 @@ import {
 	type CreateCredentialOfferInput,
 	type CreatePreAuthorizedGrantInput,
 	type CreateStatusListInput,
-	type CredentialStatus,
 	createCredentialOfferInputSchema,
 	createPreAuthorizedGrantInputSchema,
 	credentialOfferSchema,

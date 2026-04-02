@@ -304,7 +304,7 @@ describe("token exchange and issuance", () => {
 			}),
 		).toThrow(IssuerError);
 
-		const tokenResponse = issuer.exchangePreAuthorizedCode({
+		issuer.exchangePreAuthorizedCode({
 			tokenRequest: {
 				grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code",
 				"pre-authorized_code": "grant-code-1",

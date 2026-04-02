@@ -7,26 +7,43 @@
 		"url": "https://github.com/vidos-id/openid4vc-tools.git"
 	},
 	"type": "module",
-	"main": "./src/index.ts",
-	"module": "./src/index.ts",
-	"types": "./src/index.ts",
+	"engines": {
+		"node": ">=20"
+	},
+	"main": "./dist/index.mjs",
+	"types": "./dist/index.d.mts",
 	"bin": {
-		"openid4vc-wallet": "./src/index.ts"
+		"openid4vc-wallet": "./dist/index.mjs"
+	},
+	"exports": {
+		".": {
+			"development": {
+				"types": "./src/index.ts",
+				"default": "./src/index.ts"
+			},
+			"types": "./dist/index.d.mts",
+			"default": "./dist/index.mjs"
+		}
 	},
 	"publishConfig": {
-		"registry": "https://npm.pkg.github.com",
+		"registry": "https://registry.npmjs.org/",
 		"access": "public"
 	},
 	"scripts": {
-		"build": "bun build src/index.ts --target=bun --outdir=../../dist/openid4vc-wallet --entry-naming=[name].js --define __CLI_VERSION__='\"'$npm_package_version'\"'",
+		"build": "tsdown",
 		"check-types": "tsc --noEmit --project ../../tsconfig.json",
-		"test": "bun test --pass-with-no-tests"
+		"publish": "bun publish",
+		"test": "bun --conditions=development test --pass-with-no-tests"
 	},
+	"files": [
+		"dist",
+		"README.md"
+	],
 	"dependencies": {
-		"@vidos-id/openid4vc-cli-common": "workspace:*",
+		"@vidos-id/openid4vc-cli-common": "0.9.1",
+		"@vidos-id/openid4vc-wallet": "0.9.1",
 		"commander": "^14.0.3",
 		"inquirer": "^12.9.6",
-		"zod": "^4.3.6",
-		"@vidos-id/openid4vc-wallet": "workspace:*"
+		"zod": "^4.3.6"
 	}
 }

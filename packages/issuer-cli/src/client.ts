@@ -1,7 +1,6 @@
 import { verbose } from "@vidos-id/openid4vc-cli-common";
 import {
 	ACTIVE_TOKEN_STATUS,
-	type CreateIssuanceInput,
 	type CreateTemplateInput,
 	createIssuanceInputSchema,
 	createTemplateInputSchema,
@@ -9,7 +8,6 @@ import {
 	type Issuance,
 	type IssuanceDetail,
 	issuanceDetailSchema,
-	issuanceSchema,
 	REVOKED_TOKEN_STATUS,
 	type SessionResponse,
 	SUSPENDED_TOKEN_STATUS,

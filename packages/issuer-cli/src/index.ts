@@ -1,5 +1,6 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 
+import { pathToFileURL } from "node:url";
 import {
 	handleCliError,
 	resolveCliVersion,
@@ -39,6 +40,8 @@ export async function runCli(argv = process.argv): Promise<void> {
 	}
 }
 
-if (import.meta.main) {
-	await runCli();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? process.cwd()).href) {
+	void runCli().catch((error) => {
+		handleCliError(error);
+	});
 }

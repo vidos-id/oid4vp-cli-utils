@@ -267,13 +267,17 @@ describe("wallet-cli", () => {
 		const walletDir = await mkdtemp(join(tmpdir(), "wallet-cli-delete-one-"));
 		try {
 			const { storage, credentials } = await seedTwoCredentials(walletDir);
+			const credential = credentials[0];
+			if (!credential) {
+				throw new Error("Expected a stored credential");
+			}
 
 			await deleteCredentialAction({
 				walletDir,
-				credentialId: credentials[0]!.id,
+				credentialId: credential.id,
 			});
 
-			expect(await storage.getCredential(credentials[0]!.id)).toBeNull();
+			expect(await storage.getCredential(credential.id)).toBeNull();
 			expect(await storage.listCredentials()).toHaveLength(1);
 		} finally {
 			await rm(walletDir, { recursive: true, force: true });

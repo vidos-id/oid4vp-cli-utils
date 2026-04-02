@@ -10,9 +10,9 @@
 		"./client": "./src/client.ts"
 	},
 	"scripts": {
-		"dev": "bun --watch src/main.ts",
+		"dev": "bun --conditions=development --watch src/main.ts",
 		"build": "tsc --noEmit --project tsconfig.json",
-		"test": "bun test --pass-with-no-tests",
+		"test": "bun --conditions=development test --pass-with-no-tests",
 		"db:generate": "drizzle-kit generate",
 		"check-types": "tsc --noEmit --project tsconfig.json"
 	},

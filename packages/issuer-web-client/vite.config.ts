@@ -4,6 +4,9 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
 	plugins: [react(), tailwindcss()],
+	resolve: {
+		conditions: ["development"],
+	},
 	server: {
 		port: 5174,
 		proxy: {

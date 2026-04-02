@@ -8,6 +8,7 @@
 		"jsx": "react-jsx",
 		"allowJs": true,
 		"types": ["bun"],
+		"customConditions": ["development"],
 
 		// Bundler mode
 		"moduleResolution": "bundler",
@@ -26,5 +27,11 @@
 		"noUnusedLocals": false,
 		"noUnusedParameters": false,
 		"noPropertyAccessFromIndexSignature": false
-	}
+	},
+	"exclude": [
+		"**/node_modules",
+		"**/dist",
+		"**/build",
+		"packages/issuer-web-server/drizzle"
+	]
 }

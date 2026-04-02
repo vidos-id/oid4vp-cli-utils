@@ -61,6 +61,11 @@
 				"tsconfig.*.json"
 			],
 			"outputs": []
+		},
+		"publish": {
+			"dependsOn": ["build"],
+			"cache": false,
+			"outputs": []
 		}
 	},
 	"globalDependencies": [

@@ -7,19 +7,20 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.10"
 
-      - run: bun install
+      - run: bun install --frozen-lockfile
 
       - run: bun run check-types
 
@@ -27,26 +28,40 @@ jobs:
 
       - run: bun run build
 
-      - name: Publish GitHub Packages
+      - name: Require release notes file
+        run: test -f .release_notes.md
+
+      - name: Publish npm packages
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_CONFIG_TOKEN }}
-        run: |
-          bun publish --cwd packages/cli-common --registry=https://npm.pkg.github.com
-          bun publish --cwd packages/wallet --registry=https://npm.pkg.github.com
-          bun publish --cwd packages/issuer --registry=https://npm.pkg.github.com
-          bun publish --cwd packages/wallet-cli --registry=https://npm.pkg.github.com
-          bun publish --cwd packages/issuer-cli --registry=https://npm.pkg.github.com
+        run: bun run publish
 
       - name: Prepare release artifacts
         run: |
-          cp dist/openid4vc-wallet/index.js openid4vc-wallet.js
-          cp dist/openid4vc-issuer/index.js openid4vc-issuer.js
-          chmod +x openid4vc-wallet.js openid4vc-issuer.js
+          cp packages/wallet-cli/dist/index.mjs openid4vc-wallet.mjs
+          cp packages/issuer-cli/dist/index.mjs openid4vc-issuer.mjs
+          chmod +x openid4vc-wallet.mjs openid4vc-issuer.mjs
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           body_path: .release_notes.md
           files: |
-            openid4vc-wallet.js
-            openid4vc-issuer.js
+            openid4vc-wallet.mjs
+            openid4vc-issuer.mjs
+
+      - name: Delete consumed release notes file
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git fetch origin "${DEFAULT_BRANCH}"
+          git switch -C "${DEFAULT_BRANCH}" "origin/${DEFAULT_BRANCH}"
+          if [ ! -f .release_notes.md ]; then
+            exit 0
+          fi
+          rm .release_notes.md
+          git add .release_notes.md
+          git commit -m "chore: clear release notes after ${GITHUB_REF_NAME}"
+          git push origin "${DEFAULT_BRANCH}"

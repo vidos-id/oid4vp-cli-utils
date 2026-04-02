@@ -26,10 +26,7 @@ export async function authSignInAction(
 	const client = new IssuerWebClient({ serverUrl, fetchImpl: deps.fetchImpl });
 	const session = options.anonymous
 		? await client.signInAnonymous()
-		: await client.signInUsername({
-				username: options.username!,
-				password: options.password!,
-			});
+		: await signInWithUsernamePassword(client, options);
 	const user = requireUser(session);
 	await writeStoredSession(
 		{
@@ -110,6 +107,20 @@ export async function authSignOutAction(
 		await clearStoredSession(options);
 	}
 	return { serverUrl };
+}
+
+async function signInWithUsernamePassword(
+	client: IssuerWebClient,
+	options: { username?: string; password?: string },
+) {
+	if (!options.username || !options.password) {
+		throw new Error("Provide --anonymous or both --username and --password");
+	}
+
+	return client.signInUsername({
+		username: options.username,
+		password: options.password,
+	});
 }
 
 function requireUser(session: SessionResponse) {

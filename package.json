@@ -15,6 +15,7 @@
 		"@types/react-dom": "^19.2.3",
 		"@vitejs/plugin-react": "^6.0.1",
 		"drizzle-kit": "^0.31.10",
+		"tsdown": "^0.21.7",
 		"turbo": "^2.9.0",
 		"typescript": "^5.9.3",
 		"vite": "^8.0.3"
@@ -22,12 +23,14 @@
 	"scripts": {
 		"build": "turbo build",
 		"check-types": "turbo check-types",
-		"demo:e2e": "bun scripts/demo-e2e.ts",
-		"demo:oid4vci": "bun scripts/demo-oid4vci-e2e.ts",
+		"demo:e2e": "bun --conditions=development scripts/demo-e2e.ts",
+		"demo:oid4vci": "bun --conditions=development scripts/demo-oid4vci-e2e.ts",
 		"dev": "turbo dev",
 		"dev:issuer-web": "turbo dev --filter='@vidos-id/openid4vc-issuer-web-server' --filter='@vidos-id/openid4vc-issuer-web-client'",
 		"dev:issuer-web-client": "turbo dev --filter='@vidos-id/openid4vc-issuer-web-client'",
 		"dev:issuer-web-server": "turbo dev --filter='@vidos-id/openid4vc-issuer-web-server'",
+		"publish": "turbo publish --filter='@vidos-id/openid4vc-cli-common' --filter='@vidos-id/openid4vc-wallet' --filter='@vidos-id/openid4vc-issuer' --filter='@vidos-id/openid4vc-issuer-web-shared' --filter='@vidos-id/openid4vc-wallet-cli' --filter='@vidos-id/openid4vc-issuer-cli'",
+		"release:version": "bun scripts/release-version.ts",
 		"test": "turbo test",
 		"lint": "biome check --write ."
 	},
