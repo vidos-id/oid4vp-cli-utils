@@ -65,7 +65,12 @@
 		"package-publish": {
 			"dependsOn": ["build"],
 			"cache": false,
-			"passThroughEnv": ["NPM_CONFIG_TAG"],
+			"passThroughEnv": [
+				"NPM_CONFIG_TAG",
+				"ACTIONS_ID_TOKEN_REQUEST_URL",
+				"ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+				"GITHUB_ACTIONS"
+			],
 			"outputs": []
 		}
 	},

@@ -3,7 +3,7 @@
 	"version": "0.8.0",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/vidos-id/openid4vc-tools.git"
+		"url": "git+https://github.com/vidos-id/openid4vc-tools.git"
 	},
 	"type": "module",
 	"main": "./src/index.ts",
