@@ -13,8 +13,6 @@ if (!apiKey) {
 	throw new Error("Missing OPENCODE_ZEN_API_KEY.");
 }
 
-const model = process.env.OPENCODE_ZEN_MODEL ?? "mimo-v2-pro-free";
-
 function runGit(args: string[], allowFailure = false): string {
 	const result = Bun.spawnSync(["git", ...args], {
 		stdout: "pipe",
@@ -46,6 +44,34 @@ const opencodeZen = createOpenAICompatible({
 	baseURL: "https://opencode.ai/zen/v1",
 	apiKey,
 });
+
+async function getFreeModels(): Promise<string[]> {
+	const response = await fetch("https://opencode.ai/zen/v1/models");
+
+	if (!response.ok) {
+		throw new Error(
+			`Failed to fetch OpenCode Zen models: ${response.status} ${await response.text()}`,
+		);
+	}
+
+	const payload = (await response.json()) as {
+		data?: Array<{
+			id?: string;
+		}>;
+	};
+
+	const models = (payload.data ?? [])
+		.map((entry) => entry.id)
+		.filter(
+			(id): id is string => typeof id === "string" && id.endsWith("-free"),
+		);
+
+	if (models.length === 0) {
+		throw new Error("OpenCode Zen did not return any free models.");
+	}
+
+	return models;
+}
 
 const skillInstructions = await Bun.file(
 	".agents/skills/generate-release-notes/SKILL.md",
@@ -87,18 +113,38 @@ const userPrompt = [
 	commitLog || "- none",
 ].join("\n");
 
-const { text } = await generateText({
-	model: opencodeZen.chatModel(model),
-	system: systemPrompt,
-	prompt: userPrompt,
-	temperature: 0.2,
-	maxRetries: 1,
-});
+const freeModels = await getFreeModels();
 
-const generatedNotes = unwrapMarkdownFence(text);
+let generatedNotes = "";
+const modelErrors: string[] = [];
+
+for (const model of freeModels) {
+	try {
+		const { text } = await generateText({
+			model: opencodeZen.chatModel(model),
+			system: systemPrompt,
+			prompt: userPrompt,
+			temperature: 0.2,
+			maxRetries: 1,
+		});
+
+		generatedNotes = unwrapMarkdownFence(text);
+
+		if (!generatedNotes) {
+			throw new Error("returned an empty release note body");
+		}
+
+		break;
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		modelErrors.push(`${model}: ${errorMessage}`);
+	}
+}
 
 if (!generatedNotes) {
-	throw new Error("OpenCode Zen returned an empty release note body.");
+	throw new Error(
+		`OpenCode Zen failed for all free models:\n${modelErrors.join("\n")}`,
+	);
 }
 
 await Bun.write(".release_notes.md", `${generatedNotes}\n`);

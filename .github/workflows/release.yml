@@ -39,7 +39,6 @@ jobs:
         if: ${{ inputs.generate_ai_release_notes }}
         env:
           OPENCODE_ZEN_API_KEY: ${{ secrets.OPENCODE_ZEN_API_KEY }}
-          OPENCODE_ZEN_MODEL: ${{ vars.OPENCODE_ZEN_MODEL || 'mimo-v2-pro-free' }}
         run: bun run release:notes ${{ inputs.version }}
 
       - name: Require AI release notes file
