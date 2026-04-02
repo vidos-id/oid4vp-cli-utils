@@ -56,6 +56,8 @@ jobs:
           git tag "v${VERSION}"
 
       - name: Publish npm packages
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_CONFIG_TOKEN }}
         run: bun run publish
 
       - name: Push release commit and tag
