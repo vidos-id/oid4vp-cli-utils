@@ -1,6 +1,6 @@
 {
 	"name": "openid4vc-tools",
-	"version": "0.10.0-rc1",
+	"version": "0.0.0-rc.1",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/vidos-id/openid4vc-tools.git"

@@ -1,7 +1,7 @@
 {
 	"name": "@vidos-id/openid4vc-issuer",
 	"description": "Issuer library for holder-bound dc+sd-jwt credentials.",
-	"version": "0.10.0-rc1",
+	"version": "0.0.0-rc.1",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/vidos-id/openid4vc-tools.git",
