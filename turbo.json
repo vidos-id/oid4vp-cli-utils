@@ -65,6 +65,7 @@
 		"publish": {
 			"dependsOn": ["build"],
 			"cache": false,
+			"passThroughEnv": ["NPM_CONFIG_TOKEN"],
 			"outputs": []
 		}
 	},
